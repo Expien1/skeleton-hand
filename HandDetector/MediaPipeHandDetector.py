@@ -2,11 +2,11 @@ import numpy as np
 import cv2
 import mediapipe as mp
 
-from .VisualHandsDetector import VisualHandsDetector
-from ..OneHand import OneHand
+from .VisualHandDetector import VisualHandDetector
+from ..HandData.OneHand import OneHand
 
 
-class MediaPipeHandsDetector(VisualHandsDetector):
+class MediaPipeHandDetector(VisualHandDetector):
     __slots__ = "_detector"
 
     def __init__(

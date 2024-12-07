@@ -131,11 +131,12 @@ class OneHand:
             self._thumb_dist[i] = np.linalg.norm(thumb_tip_point - finger_point, ord=1)
         return self._thumb_dist
 
-    def integrated(self) -> np.ndarray:
+    @property
+    def data(self) -> np.ndarray:
         """整合所有手部相关数据并输出为一维数组"""
-        pos = self._norm_pos.copy()
+        data = self._norm_pos.copy()
         if self.is_left:  # 将数据统一成右手数据
-            pos[:, 0] = 1 - self._norm_pos[:, 0]
-        pos = np.ravel(pos, order="C")
+            data[:, 0] = 1 - self._norm_pos[:, 0]
+        data = np.ravel(data, order="C")
         angle = np.ravel(self._fingers_angle, order="C")
-        return np.concatenate((pos, angle, self._thumb_dist))
+        return np.concatenate((data, angle, self._thumb_dist))

@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..OneHand import OneHand
+from ..HandData.OneHand import OneHand
 
 
-class VisualHandsDetector(ABC):
+class VisualHandDetector(ABC):
     """基于视觉的手部关键点检测器"""
 
     @abstractmethod

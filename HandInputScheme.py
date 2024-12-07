@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import multiprocessing
 
-from .Camera import Camera
+from .HandsUtils.Camera import Camera
 from .HandsInput import HandsInput
 from .HandsDetector.MediaPipeHandsDetector import MediaPipeHandsDetector
 
