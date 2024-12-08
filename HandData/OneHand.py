@@ -10,6 +10,7 @@ class OneHand:
         "_fingers_angle",
         "T4VEC",
         "_thumb_dist",
+        "_data",
     )
 
     def __init__(self):
@@ -58,10 +59,16 @@ class OneHand:
         # 定义一个一维数组来存储大拇指与其他关键点的距离
         self._thumb_dist: np.ndarray = np.empty(7, dtype=np.float64)
 
+        # 创建一个一维数组用于收集所有的一维手部数据
+        self._data: np.ndarray | None = None  # 初始值为None表示为更新同步
+
     def update(self):
-        self.normalization()
-        self.calc_5fingers_angle()
-        self.calc_thumb_distance()
+        """计算并更新手部数据"""
+        self.normalization()  # 将图片坐标归一化
+        self.calc_5fingers_angle()  # 计算手指关节的弯曲角度
+        self.calc_thumb_distance()  # 计算大拇指到其他关键点的距离
+        # 所有手部数据的数组暂时不更新,使用时才更新
+        self._data = None
 
     @property
     def norm_pos(self) -> np.ndarray:
@@ -134,9 +141,17 @@ class OneHand:
     @property
     def data(self) -> np.ndarray:
         """整合所有手部相关数据并输出为一维数组"""
-        data = self._norm_pos.copy()
-        if self.is_left:  # 将数据统一成右手数据
-            data[:, 0] = 1 - self._norm_pos[:, 0]
-        data = np.ravel(data, order="C")
-        angle = np.ravel(self._fingers_angle, order="C")
-        return np.concatenate((data, angle, self._thumb_dist))
+        # 检查当前的data数据是否已经更新
+        if self._data is None:
+            # 更新data数据
+            self._data = self._norm_pos.copy()
+            if self.is_left:  # 将数据统一成右手数据
+                self._data[:, 0] = 1 - self._norm_pos[:, 0]
+            # 将数据展平然后合并
+            self._data = np.ravel(self._data, order="C")
+            self._data =  np.concatenate((
+                self._data, 
+                np.ravel(self._fingers_angle, order="C"), 
+                self._thumb_dist
+            ))
+        return self._data
