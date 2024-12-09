@@ -23,7 +23,7 @@ class HandInput:
         detector_kwargs["max_num_hands"] = len(hands_name_ls)
         self.detector: VisualHandDetector = hands_detector(**detector_kwargs)
         # 定义集成数据之后的列名
-        self.columns_name = Series(
+        self.columns_name: Series = Series(
             (
                 "norm_pos0_x",
                 "norm_pos0_y",
@@ -146,47 +146,53 @@ class HandInput:
         """获取对应名字的手部最小矩形框的在图片中的xxyy坐标"""
         return self.hands_dict[name].box
 
-    def get_img_pos(self, name: str, id: int = -1) -> np.ndarray:
-        """获取对应名字的手部在图片中的关键点xyz坐标,坐标id错误则报错"""
+    def get_img_pos(self, name: str, point_id: int = -1) -> np.ndarray:
+        """获取对应名字的手部在图片中的关键点xyz坐标,坐标point_id错误则报错"""
         one_hand = self.hands_dict[name]
-        if 20 >= id >= 0:
-            return one_hand.raw_pos[id, :]
-        elif id == -1:
+        if 20 >= point_id >= 0:
+            return one_hand.raw_pos[point_id, :]
+        elif point_id == -1:
             return one_hand.raw_pos
-        raise ValueError(f"There is no coordinate data with id {id}")
+        raise ValueError(f"There is no coordinate data with point_id {point_id}")
 
-    def get_norm_pos(self, name: str, id: int = -1) -> np.ndarray:
-        """获取对应名字的手部在归一化后的关键点xyz坐标,坐标id错误则报错"""
+    def get_norm_pos(self, name: str, point_id: int = -1) -> np.ndarray:
+        """获取对应名字的手部在归一化后的关键点xyz坐标,坐标point_id错误则报错"""
         one_hand = self.hands_dict[name]
-        if 20 >= id >= 0:
-            return one_hand.norm_pos[id, :]
-        elif id == -1:
+        if 20 >= point_id >= 0:
+            return one_hand.norm_pos[point_id, :]
+        elif point_id == -1:
             return one_hand.norm_pos
-        raise ValueError(f"There is no coordinate data with id {id}")
+        raise ValueError(f"There is no coordinate data with point_id {point_id}")
 
     def get_norm_pos_to_img(
-        self, name: str, id: int, img_w: int, img_h: int, padx: int, pady: int
+        self,
+        name: str,
+        point_id: int = -1,
+        img_w: int = 100,
+        img_h: int = 100,
+        padx: int = 10,
+        pady: int = 10,
     ) -> tuple[int, int, float]:
-        if id == -1:
-            raise ValueError(f"There is no coordinate data with id {id}")
-        res = list(self.get_norm_pos(name, id))
+        if point_id == -1:
+            raise ValueError(f"There is no coordinate data with point_id {point_id}")
+        res = list(self.get_norm_pos(name, point_id))
         res[0] = int(res[0] * (img_w - (2 * padx)) + padx)
         res[1] = int(res[1] * (img_h - (2 * pady)) + pady)
         return tuple(res)
 
-    def get_angle(self, name: str, id: int = -1) -> np.ndarray:
+    def get_angle(self, name: str, point_id: int = -1) -> np.ndarray:
         """获取对应名字的手部关键点弧度制角度"""
-        if id == -1:  # 没有输入id则返回全部角度
+        if point_id == -1:  # 没有输入point_id则返回全部角度
             one_hand = self.hands_dict[name]
             return one_hand.fingers_angle
-        if id > 20 or id < 0:
-            raise ValueError(f"There is no angle data with id {id}")
+        if point_id > 20 or point_id < 0:
+            raise ValueError(f"There is no angle data with point_id {point_id}")
         # 计算关键点对应的角度数组中的索引
-        finger_id, angle_id = divmod(id, 4)
+        finger_id, angle_id = divmod(point_id, 4)
         if angle_id != 0:
             one_hand = self.hands_dict[name]
             return one_hand.fingers_angle[finger_id, (angle_id - 1)]
-        raise ValueError(f"There is no angle data with id {id}")
+        raise ValueError(f"There is no angle data with point_id {point_id}")
 
     def get_thumb_dist(self, name: str, other_point_id: int = -1) -> np.ndarray:
         """获取对应名字的手部,从拇指到其他手指关键点的曼哈顿距离"""
@@ -198,7 +204,7 @@ class HandInput:
             return one_hand.thumb_dist[arr_id]
         elif other_point_id == -1:  # 没有输入id则返回全部到拇指的距离
             return one_hand.thumb_dist
-        raise ValueError(f"There is no distance data with id {id}")
+        raise ValueError(f"There is no distance data with point_id {other_point_id}")
 
     def get_hand_data(self, name: str) -> np.ndarray:
         """整合并返回对应名字的手部的所有连续型数据的一维数组"""

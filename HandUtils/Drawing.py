@@ -139,6 +139,54 @@ class HandDrawing:
                 xp, yp = xi, yi
         return bg_img
 
+    @staticmethod
+    def draw_hand_data(
+        data: np.ndarray,
+        bg_img_w: int = 300,
+        bg_img_h: int = 300,
+        padx: int = 30,
+        pady: int = 30,
+        point_radius: int = 4,
+        bg_colorBGR: tuple[int, int, int] = (0, 0, 0),
+        hand_colorBGR: tuple[int, int, int] = (255, 255, 255),
+        thickness: int = 3,
+        base_rgb: int = 4,
+    ) -> np.ndarray:
+        """绘制归一化后的手部坐标"""
+        # 创建新的背景图
+        bg_img = np.ones((bg_img_h, bg_img_w, 3), dtype=np.uint8)
+        bg_img[:, :, 0] *= bg_colorBGR[0]  # 为背景图上色
+        bg_img[:, :, 1] *= bg_colorBGR[1]
+        bg_img[:, :, 2] *= bg_colorBGR[2]
+        # data的前63列为手部数据的一维数组
+        x0, y0 = data[:2]
+        x0 = int(x0 * (bg_img_w - (2 * padx)) + padx)
+        y0 = int(y0 * (bg_img_h - (2 * pady)) + pady)
+        xp, yp = x0, y0
+        for i in range(21):
+            # 绘制关键点
+            point_x, point_y, point_z = data[i * 3 : i * 3 + 3]
+            point_x = int(point_x * (bg_img_w - (2 * padx)) + padx)
+            point_y = int(point_y * (bg_img_h - (2 * pady)) + pady)
+            # 用颜色深度表示z轴
+            point_color = tuple(
+                map(
+                    lambda c: int((c / base_rgb) * (1 + (base_rgb - 1) * point_z)),
+                    hand_colorBGR,
+                )
+            )
+            cv2.circle(bg_img, (point_x, point_y), point_radius, point_color, thickness)
+            # 绘制手部连线
+            xi, yi = data[i * 3 : i * 3 + 2]
+            xi = int(xi * (bg_img_w - (2 * padx)) + padx)
+            yi = int(yi * (bg_img_h - (2 * pady)) + pady)
+            cv2.line(bg_img, (xp, yp), (xi, yi), point_color, thickness)
+            if i % 4 == 0:
+                xp, yp = x0, y0
+            else:
+                xp, yp = xi, yi
+        return bg_img
+
     def draw_box(
         self,
         name: str,
