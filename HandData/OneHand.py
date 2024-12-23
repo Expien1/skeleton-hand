@@ -29,7 +29,7 @@ class OneHand:
         # 定义一个5x3的二维数组用来存储5根手指的3个关节点的弯曲角度
         self._fingers_angle: np.ndarray = np.empty((5, 3), dtype=np.float64)
         # 定义一个一维数组来存储大拇指与其他关键点的距离
-        self._thumb_dist: np.ndarray = np.empty(7, dtype=np.float64)
+        self._thumb_dist: np.ndarray = np.empty(4, dtype=np.float64)
 
         # 创建一个一维数组用于收集所有的一维手部数据
         self._data: np.ndarray | None = None  # 初始值为None表示为更新同步
@@ -101,7 +101,7 @@ class OneHand:
     def calc_thumb_distance(self) -> np.ndarray:
         """计算大拇指指尖到其他关键点的距离"""
         thumb_tip_point = self._norm_pos[4, :]
-        for i, finger_id in enumerate((5, 6, 7, 8, 12, 16, 20)):
+        for i, finger_id in enumerate((8, 12, 16, 20)):
             # 用曼哈顿距离的计算量没有欧式距离大
             # 根据手指的编号获取该点的归一化的xyz坐标
             finger_point = self._norm_pos[finger_id, :]

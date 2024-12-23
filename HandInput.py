@@ -33,7 +33,7 @@ class HandInput:
                 "norm_pos1_z",
                 "norm_pos2_x",
                 "norm_pos2_y",
-                "norm_p os2_z",
+                "norm_pos2_z",
                 "norm_pos3_x",
                 "norm_pos3_y",
                 "norm_pos3_z",
@@ -103,9 +103,6 @@ class HandInput:
                 "p17_angle",
                 "p18_angle",
                 "p19_angle",
-                "pos5_2thumb",
-                "pos6_2thumb",
-                "pos7_2thumb",
                 "pos8_2thumb",
                 "pos12_2thumb",
                 "pos16_2thumb",
@@ -197,7 +194,7 @@ class HandInput:
     def get_thumb_dist(self, name: str, other_point_id: int = -1) -> np.ndarray:
         """获取对应名字的手部,从拇指到其他手指关键点的曼哈顿距离"""
         one_hand = self.hands_dict[name]
-        if other_point_id in (5, 6, 7, 8, 12, 16, 20):
+        if other_point_id in (8, 12, 16, 20):
             # 计算对应的数组的索引
             finger_id, knuckle_id = divmod(other_point_id, 4)
             arr_id = (knuckle_id - 1) if knuckle_id != 0 else (finger_id + 1)
