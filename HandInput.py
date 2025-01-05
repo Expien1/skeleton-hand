@@ -110,7 +110,7 @@ class HandInput:
             )
         )
 
-    def run(self, image: np.ndarray) -> list[str]:
+    def detect(self, image: np.ndarray) -> list[str]:
         """
         运行手部关键点检测器
         检测成功则返回成功检测到的手部的名称
@@ -122,46 +122,68 @@ class HandInput:
     def get_hand_img(
         self, name: str, original_img: np.ndarray, padx: int = 10, pady: int = 10
     ) -> np.ndarray | None:
-        """截取对应名字的手部图片,返回截取后的图片"""
-        # 获取手部矩形框
-        x0, y0, x1, y1 = self.get_hand_box(name)
-        # 保证xxyy都为正整数
-        x0 -= padx
-        x0 = x0 if x0 >= 0 else 0
+        """
+        截取对应名字的手部图片
+        返回截取后的图片
+        """
+        x0, y0, x1, y1 = self.get_hand_box(name)  # 获取手部矩形框
+        x0 -= padx  # 设置边缘
         x1 += padx
-        x1 = x1 if x1 >= 0 else 0
         y0 -= pady
-        y0 = y0 if y0 >= 0 else 0
         y1 += pady
-        y1 = y1 if y1 >= 0 else 0
+        # 保证xxyy都为正整数
+        x0, y0, x1, y1 = map(lambda x: x if x >= 0 else 0, (x0, y0, x1, y1))
         # 保证所裁切出来的图片有效
         if x0 == x1 or y0 == y1:
             return None
         return original_img[y0:y1, x0:x1, :]
 
     def get_hand_box(self, name: str) -> tuple[int, int, int, int]:
-        """获取对应名字的手部最小矩形框的在图片中的xxyy坐标"""
+        """
+        获取对应名字的手部最小矩形框的在图片中的xxyy坐标
+        """
         return self.hands_dict[name].box
 
     def get_img_pos(self, name: str, point_id: int = -1) -> np.ndarray:
-        """获取对应名字的手部在图片中的关键点xyz坐标,坐标point_id错误则报错"""
+        """
+        获取名字为name的手部的第point_id个关键点在图片中的像素坐标
+        name: 输入手部名称
+        point_id: 输入关键点编号,默认值-1则返回所有关键点的像素坐标
+        """
         one_hand = self.hands_dict[name]
-        if 20 >= point_id >= 0:
-            return one_hand.raw_pos[point_id, :]
-        elif point_id == -1:
-            return one_hand.raw_pos
+        if 20 >= point_id >= 0:  # 返回指定关键点的像素坐标
+            return one_hand.raw_pos[point_id, :2].astype(np.int32)
+        elif point_id == -1:  # 返回所有关键点的像素坐标
+            return one_hand.raw_pos[:, :2].astype(np.int32)
         raise ValueError(f"There is no coordinate data with point_id {point_id}")
 
     def get_norm_pos(self, name: str, point_id: int = -1) -> np.ndarray:
-        """获取对应名字的手部在归一化后的关键点xyz坐标,坐标point_id错误则报错"""
+        """
+        获取名字为name的手部的第point_id个关键点的xyz归一化坐标
+        name: 输入手部名称
+        point_id: 输入关键点编号,默认值-1则返回所有关键点的归一化坐标
+        """
         one_hand = self.hands_dict[name]
-        if 20 >= point_id >= 0:
+        if 20 >= point_id >= 0:  # 返回指定的关键点归一化坐标
             return one_hand.norm_pos[point_id, :]
-        elif point_id == -1:
-            return one_hand.norm_pos
+        elif point_id == -1:  # 返回该手部所有的关键点的归一化坐标
+            return one_hand.norm_pos[:, :]  # 返回nrom_pos的副本,防止原来的数据被修改
         raise ValueError(f"There is no coordinate data with point_id {point_id}")
 
-    def get_norm_pos_to_img(
+    def get_delta_img_pos(self, name: str, point_id: int = -1) -> np.ndarray:
+        """
+        获取名字为name的手部的第point_id个关键点两帧差的像素坐标
+        name: 输入手部名称
+        point_id: 输入关键点编号,默认值-1则返回所有关键点两帧差的像素坐标
+        """
+        one_hand = self.hands_dict[name]
+        if 20 >= point_id >= 0:  # 返回指定关键点的两帧像素差坐标
+            return one_hand.delta_pos[point_id, :]
+        elif point_id == -1:  # 返回所有关键点的两帧像素差坐标
+            return one_hand.delta_pos[:, :]
+        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+
+    def get_norm2img_pos(
         self,
         name: str,
         point_id: int = -1,
@@ -169,30 +191,45 @@ class HandInput:
         img_h: int = 100,
         padx: int = 10,
         pady: int = 10,
-    ) -> tuple[int, int, float]:
-        if point_id == -1:
-            raise ValueError(f"There is no coordinate data with point_id {point_id}")
-        res = list(self.get_norm_pos(name, point_id))
-        res[0] = int(res[0] * (img_w - (2 * padx)) + padx)
-        res[1] = int(res[1] * (img_h - (2 * pady)) + pady)
-        return tuple(res)
+    ) -> np.ndarray:
+        """
+        将归一化后的坐标转化为特定大小的图片位置坐标
+        """
+        npos = self.get_norm_pos(name, point_id)
+        npos[:, 0] = npos[:, 0] * (img_w - (2 * padx)) + padx
+        npos[:, 1] = npos[:, 1] * (img_h - (2 * pady)) + pady
+        return npos
 
     def get_angle(self, name: str, point_id: int = -1) -> np.ndarray:
-        """获取对应名字的手部关键点弧度制角度"""
-        if point_id == -1:  # 没有输入point_id则返回全部角度
-            one_hand = self.hands_dict[name]
-            return one_hand.fingers_angle
-        if point_id > 20 or point_id < 0:
-            raise ValueError(f"There is no angle data with point_id {point_id}")
-        # 计算关键点对应的角度数组中的索引
-        finger_id, angle_id = divmod(point_id, 4)
-        if angle_id != 0:
-            one_hand = self.hands_dict[name]
+        """
+        获取对应名字的手部关键点弧度制角度
+        其中指尖和手腕没有角度数据
+        """
+        one_hand = self.hands_dict[name]
+        finger_id, angle_id = divmod(point_id, 4)  # 计算关键点对应的角度数组中的索引
+        if 20 >= point_id > 0 and angle_id != 0:  # 指尖和手腕没有角度数据
             return one_hand.fingers_angle[finger_id, (angle_id - 1)]
+        elif point_id == -1:  # 没有输入point_id则返回全部角度
+            return one_hand.fingers_angle[:, :]
+        raise ValueError(f"There is no angle data with point_id {point_id}")
+
+    def get_delta_angle(self, name: str, point_id: int = -1) -> np.ndarray:
+        """
+        获取对应名字的手部关键点弧度制角度差
+        其中指尖和手腕没有角度数据
+        """
+        one_hand = self.hands_dict[name]
+        finger_id, angle_id = divmod(point_id, 4)  # 计算关键点对应的角度数组中的索引
+        if 20 >= point_id > 0 and angle_id != 0:  # 指尖和手腕没有角度数据
+            return one_hand.delta_angle[finger_id, (angle_id - 1)]
+        elif point_id == -1:  # 没有输入point_id则返回全部角度差
+            return one_hand.delta_angle[:, :]
         raise ValueError(f"There is no angle data with point_id {point_id}")
 
     def get_thumb_dist(self, name: str, other_point_id: int = -1) -> np.ndarray:
-        """获取对应名字的手部,从拇指到其他手指关键点的曼哈顿距离"""
+        """
+        获取对应名字的手部的从拇指到其他手指关键点的曼哈顿距离
+        """
         one_hand = self.hands_dict[name]
         if other_point_id in (8, 12, 16, 20):
             # 计算对应的数组的索引
@@ -200,17 +237,23 @@ class HandInput:
             arr_id = (knuckle_id - 1) if knuckle_id != 0 else (finger_id + 1)
             return one_hand.thumb_dist[arr_id]
         elif other_point_id == -1:  # 没有输入id则返回全部到拇指的距离
-            return one_hand.thumb_dist
+            return one_hand.thumb_dist[:]
         raise ValueError(f"There is no distance data with point_id {other_point_id}")
 
-    def get_hand_data(self, name: str) -> np.ndarray:
-        """整合并返回对应名字的手部的所有连续型数据的一维数组"""
+    def get_hand_data(self, name: str | None = None) -> np.ndarray:
+        """
+        获取对应名字的手部的所有连续型数据的数组
+        """
+        if name is None:  # name没有填入参数,则返回全部手部数据
+            return np.vstack(
+                [self.hands_dict[n].data.reshape(1, -1) for n in self.hands_dict.keys()]
+            )
+        # 返回对应名字的手部数据
         one_hand = self.hands_dict[name]
-        return one_hand.data
+        return one_hand.data.reshape(1, -1)
 
-    def get_hand_DataFrame(self, name: str) -> DataFrame:
-        """整合并返回对应名字的手部的所有连续型数据的一维数组"""
-        return DataFrame(
-            self.hands_dict[name].data.reshape(1, -1),
-            columns=self.columns_name,
-        )
+    def get_hand_DataFrame(self, name: str | None = None) -> DataFrame:
+        """
+        获取对应名字的手部的所有连续型数据的DataFrame格式的数据
+        """
+        return DataFrame(self.get_hand_data(name), columns=self.columns_name)

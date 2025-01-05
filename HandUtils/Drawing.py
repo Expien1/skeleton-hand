@@ -18,12 +18,12 @@ class HandDrawing:
         base_rgb: int = 4,
     ) -> np.ndarray:
         """在原图中绘制手部"""
-        x0, y0 = map(int, self.hand_input.get_img_pos(name, 0)[:2])
+        x0, y0 = self.hand_input.get_img_pos(name, 0)
         xp, yp = x0, y0
         for i in range(21):
             # 绘制关键点
-            point_x, point_y = map(int, self.hand_input.get_img_pos(name, i)[:2])
-            point_z = self.hand_input.get_img_pos(name, i)[2]
+            point_x, point_y = self.hand_input.get_img_pos(name, i)
+            point_z = self.hand_input.get_norm_pos(name, i)[2]
             # 用颜色深度表示z轴
             point_color = tuple(
                 map(
@@ -35,7 +35,7 @@ class HandDrawing:
                 original_img, (point_x, point_y), point_radius, point_color, thickness
             )
             # 绘制手部连线
-            xi, yi = map(int, self.hand_input.get_img_pos(name, i)[:2])
+            xi, yi = self.hand_input.get_img_pos(name, i)
             cv2.line(original_img, (xp, yp), (xi, yi), point_color, thickness)
             if i % 4 == 0:
                 xp, yp = x0, y0
@@ -62,13 +62,11 @@ class HandDrawing:
         else:  # 复制一张图,防止绘制到同一张图片上
             hand_img = hand_img.copy()
         img_h, img_w = hand_img.shape[:2]
-        x0, y0, _ = self.hand_input.get_norm_pos_to_img(
-            name, 0, img_w, img_h, padx, pady
-        )
+        x0, y0, _ = self.hand_input.get_norm2img_pos(name, 0, img_w, img_h, padx, pady)
         xp, yp = x0, y0
         for i in range(21):
             # 绘制关键点
-            point_x, point_y, point_z = self.hand_input.get_norm_pos_to_img(
+            point_x, point_y, point_z = self.hand_input.get_norm2img_pos(
                 name, i, img_w, img_h, padx, pady
             )
             # 用颜色深度表示z轴
@@ -82,7 +80,7 @@ class HandDrawing:
                 hand_img, (point_x, point_y), point_radius, point_color, thickness
             )
             # 绘制手部连线
-            xi, yi, _ = self.hand_input.get_norm_pos_to_img(
+            xi, yi, _ = self.hand_input.get_norm2img_pos(
                 name, i, img_w, img_h, padx, pady
             )
             cv2.line(hand_img, (xp, yp), (xi, yi), point_color, thickness)
@@ -111,13 +109,13 @@ class HandDrawing:
         bg_img[:, :, 0] *= bg_colorBGR[0]  # 为背景图上色
         bg_img[:, :, 1] *= bg_colorBGR[1]
         bg_img[:, :, 2] *= bg_colorBGR[2]
-        x0, y0, _ = self.hand_input.get_norm_pos_to_img(
+        x0, y0, _ = self.hand_input.get_norm2img_pos(
             name, 0, bg_img_w, bg_img_h, padx, pady
         )
         xp, yp = x0, y0
         for i in range(21):
             # 绘制关键点
-            point_x, point_y, point_z = self.hand_input.get_norm_pos_to_img(
+            point_x, point_y, point_z = self.hand_input.get_norm2img_pos(
                 name, i, bg_img_w, bg_img_h, padx, pady
             )
             # 用颜色深度表示z轴
@@ -129,7 +127,7 @@ class HandDrawing:
             )
             cv2.circle(bg_img, (point_x, point_y), point_radius, point_color, thickness)
             # 绘制手部连线
-            xi, yi, _ = self.hand_input.get_norm_pos_to_img(
+            xi, yi, _ = self.hand_input.get_norm2img_pos(
                 name, i, bg_img_w, bg_img_h, padx, pady
             )
             cv2.line(bg_img, (xp, yp), (xi, yi), point_color, thickness)

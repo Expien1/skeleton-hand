@@ -82,5 +82,5 @@ class MediaPipeHandDetector(VisualHandDetector):
         max_z = one_hand.raw_pos[:, 2].max()
         one_hand.raw_pos[:, 2] = (one_hand.raw_pos[:, 2] - min_z) / (max_z - min_z)
         # 将原始数据处理完毕后,调用OneHand中的update方法计算并更新所有手部数据
-        one_hand.update()
+        one_hand.reset_all_flags()
         return one_hand.raw_pos
