@@ -1,16 +1,30 @@
-from collections import deque
 from time import time
 from typing import Generator
 
 import numpy as np
 import cv2
 
+from .Filter import EWMAFilter
+
 
 class Camera:
-    __slots__ = "capture", "prev_time", "fps_deque"
+    __slots__ = (
+        "capture",
+        "_prev_time",
+        "_delta_time",
+        "delta_time_is_updated",
+        "_fps",
+        "fps_is_updated",
+        "fps_filter",
+    )
 
     def __init__(
-        self, camera_idx: int = 0, max_fps: int = 30, cam_w: int = 640, cam_h: int = 480
+        self,
+        camera_idx: int = 0,
+        max_fps: int = 30,
+        cam_w: int = 640,
+        cam_h: int = 480,
+        smooth_factor: float = 0.08,
     ) -> None:
         self.capture = cv2.VideoCapture(camera_idx)  # 获取摄像头
         # 设置摄像头的打开参数,如果参数有修改才进行设置,否则跳过设置阶段
@@ -21,10 +35,16 @@ class Camera:
             self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, cam_w)
         if cam_h != self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) and cam_h > 0:
             self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_h)
-        # 相机循环标记
-        self.prev_time = time()  # 记录当前一帧结束的时间
-        # 用移动窗口平滑法,计算多个帧率平均数,让显示的帧率数更加稳定
-        self.fps_deque = deque(maxlen=max_fps)
+        # 记录当前一帧结束的时间
+        self._prev_time: float = time()
+        # 记录两帧时间差
+        self._delta_time: float = 0
+        self.delta_time_is_updated: bool = False
+        # 记录当前帧率
+        self._fps: int = 0
+        self.fps_is_updated: bool = False
+        # 创建帧率的滤波器,让帧率显示更加稳定
+        self.fps_filter: EWMAFilter = EWMAFilter(smooth_factor)
 
     @property
     def frame_width(self):
@@ -35,6 +55,13 @@ class Camera:
     def frame_height(self):
         """获取帧的高"""
         return self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+
+    @property
+    def frame_size(self) -> tuple[int, int]:
+        """获取当前摄像头打开的宽高"""
+        cam_w = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        cam_h = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        return cam_w, cam_h
 
     def set_camera_index(self, camera_idx: int) -> None:
         """重新设置摄像头索引"""
@@ -52,7 +79,8 @@ class Camera:
             success, image = self.capture.read()
             if not success:  # 是否读取帧成功
                 break  # 读取失败则结束循环
-            self.update_fps()  # 更新帧率
+            self.fps_is_updated = False  # 标记帧率未更新
+            self.delta_time_is_updated = False  # 标记两帧时间差未更新
             # 如果hflip为True则每次返回翻转后的图片
             yield cv2.flip(image, 1) if hflip else image
             # 检查按键输入来结束循环,waitKey返回-1表示没有按键输入
@@ -60,26 +88,28 @@ class Camera:
                 break  # 结束循环
 
     @property
-    def shape(self) -> tuple[int, int]:
-        """获取当前摄像头打开的宽高"""
-        cam_w = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        cam_h = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        return cam_w, cam_h
-
-    @property
     def fps(self) -> int:
         """计算当前帧率"""
-        # 用之前的帧率的平均数来代替实际帧率,显示更加稳定
-        fps = int(sum(self.fps_deque) / len(self.fps_deque))
-        return fps
+        if self.fps_is_updated:
+            return self._fps
+        self._fps = int(self.fps_filter(int(1 / self.delta_time)))
+        self.fps_is_updated = True  #  标记fps已更新
+        return self._fps
 
-    def update_fps(self):
-        """更新帧率,记录每一帧之间的时间"""
+    @property
+    def prev_time(self):
+        return self._prev_time
+
+    @property
+    def delta_time(self):
+        """记录两帧之间的间隔时间"""
+        if self.delta_time_is_updated:
+            return self._delta_time
         cur_time = time()  # 获取当前时间
-        delta_time = cur_time - self.prev_time  # 计算两帧之间的用时
-        self.prev_time = cur_time  # 更新最后时间
-        fps = int(1 / delta_time)  # 每帧的用时的倒数就是帧率
-        self.fps_deque.append(fps)  # 存入队列用于显示稳定帧率
+        self._delta_time = cur_time - self.prev_time  # 计算两帧之间的用时
+        self._prev_time = cur_time  # 更新最后时间
+        self.delta_time_is_updated = True  # 标记两帧时间差已更新
+        return self._delta_time
 
     def draw_fps(
         self,
@@ -156,7 +186,7 @@ class Camera:
 if __name__ == "__main__":
     t1 = time()
     cam = Camera()
-    print(cam.shape)
+    print(cam.frame_size)
     print(time() - t1)
     for img in cam.read():
         cam.draw_fps(img)

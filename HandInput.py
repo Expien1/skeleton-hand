@@ -1,13 +1,204 @@
 import numpy as np
-from pandas import DataFrame, Series
+from pandas import DataFrame
 
 from .HandData.OneHand import OneHand
+from .HandData.Gestrue import Gestrue
+from .HandData._global import HAND_DATA_COL_NAME
 from .HandDetector.VisualHandDetector import VisualHandDetector
 from .HandDetector.MediaPipeHandDetector import MediaPipeHandDetector
+from .HandUtils.Drawing import HandDrawing
+
+
+class BaseHandAPI:
+    __slots__ = "one_hand"
+
+    def __init__(self, one_hand: OneHand) -> None:
+        self.one_hand: OneHand = one_hand
+
+    def img_pos(self, point_id: int = -1) -> np.ndarray:
+        """获取名字为name的手部的第point_id个关键点在图片中的像素坐标
+        Args:
+            point_id: 关键点编号;默认值-1返回所有关键点的像素坐标
+        """
+        if 20 >= point_id >= 0:  # 返回指定关键点的像素坐标的副本
+            return self.one_hand.raw_pos[point_id, :2].astype(np.int32)
+        elif point_id == -1:  # 返回所有关键点的像素坐标的副本
+            return self.one_hand.raw_pos[:, :2].astype(np.int32)
+        raise ValueError(f"No coordinate data with point_id {point_id}")
+
+    def norm_pos(self, point_id: int = -1) -> np.ndarray:
+        """获取名为name的手部的索引为point_id的以手部矩形框左上角为原点的归一化xyz坐标
+        Args:
+            point_id: 关键点编号;默认值-1返回所有关键点的归一化坐标
+        """
+        if 20 >= point_id >= 0:  # 返回指定的关键点归一化坐标
+            return self.one_hand.norm_pos[point_id, :].copy()
+        elif point_id == -1:  # 返回该手部所有的关键点的归一化坐标
+            # 返回nrom_pos的副本,防止原来的数据被修改
+            return self.one_hand.norm_pos.copy()
+        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+
+    def wrist_npos(self, point_id: int = -1) -> np.ndarray:
+        """获取名为name的手部的索引为point_id的以手腕为原点的归一化xyz坐标
+        Args:
+            point_id: 关键点编号;默认值-1返回所有关键点的以手腕为原点的归一化坐标
+        """
+        if 20 >= point_id > 0:  # 返回指定的关键点归一化坐标
+            return self.one_hand.wrist_npos[point_id, :].copy()
+        elif point_id == 0:  # 以手腕坐标为原点,直接返回原点坐标000
+            return np.array([0, 0, 0], dtype=np.float32)
+        elif point_id == -1:  # 返回该手部所有的关键点的归一化坐标
+            return self.one_hand.wrist_npos.copy()
+        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+
+    def norm2img_pos(
+        self,
+        point_id: int = -1,
+        img_size: tuple[int, int] = (100, 100),
+        padding: tuple[int, int] = (0, 0),
+    ) -> np.ndarray:
+        """将归一化后的坐标转换为特定大小的图片位置坐标,返回坐标数组
+        Args:
+            point_id: 该手部的关键点编号
+            img_size: 转换的图片尺寸,(图片宽,图片高)
+            padding: 图片周围的间隔距离,(padx,pady)
+        """
+        if point_id > 20 or point_id < -1:
+            raise ValueError(f"There is no coordinate data with point_id {point_id}")
+        # 获取对应手部的关键点坐标
+        npos = (
+            self.one_hand.norm_pos[point_id, :2]
+            if 20 >= point_id >= 0
+            else self.one_hand.norm_pos[:, :2]
+        )
+        img_size_arr = np.array(img_size[::-1])
+        padding_arr = np.array(padding)
+        # 计算转换后的图片坐标
+        ipos = (npos * (img_size_arr - (2 * padding_arr))) + padding_arr
+        return ipos.astype(np.int32)
+
+    def box(self) -> np.ndarray:
+        """获取对应名字的手部最小矩形框的在图片中的xyxy像素坐标"""
+        return self.one_hand.box
+
+    def finger_angle(self, point_id: int = -1) -> np.ndarray:
+        """获取对应名字的手部关键点弧度制角度,其中指尖和手腕没有角度数据
+        Args:
+            point_id: 关键点编号;默认值-1返回所有手指关节点角度数据
+        """
+        finger_id, angle_id = divmod(point_id, 4)  # 计算关键点对应的角度数组中的索引
+        if 20 >= point_id > 0 and angle_id != 0:  # 指尖和手腕没有角度数据
+            return self.one_hand.fingers_angle[finger_id, (angle_id - 1)].copy()
+        elif point_id == -1:  # 没有输入point_id则返回全部角度
+            return self.one_hand.fingers_angle.copy()
+        raise ValueError(f"There is no angle data with point_id {point_id}")
+
+    def thumb_dist(self, other_point_id: int = -1) -> np.ndarray:
+        """获取对应名字的手部的从大拇指到其他手指关键点的曼哈顿距离
+        Args:
+            point_id: 关键点编号;默认值-1返回4根指尖到大拇指指尖的距离
+        """
+        if other_point_id in (8, 12, 16, 20):
+            # 计算对应的数组的索引
+            finger_id, knuckle_id = divmod(other_point_id, 4)
+            arr_id = (knuckle_id - 1) if knuckle_id != 0 else (finger_id + 1)
+            return self.one_hand.thumb_dist[arr_id].copy()
+        elif other_point_id == -1:  # 没有输入id则返回全部到拇指的距离
+            return self.one_hand.thumb_dist.copy()
+        raise ValueError(f"There is no distance data with point_id {other_point_id}")
+
+    def wrist_npos_diff(self, point_id: int = -1) -> np.ndarray:
+        """获取名字为name的手部的第point_id个关键点两帧之间的归一化坐标差值
+        Args:
+            point_id: 关键点编号,默认值-1则返回所有两帧差坐标
+        """
+        if 20 >= point_id >= 0:  # 返回指定关键点的两帧像素差坐标
+            return self.one_hand.wrist_npos_diff[point_id].copy()
+        elif point_id == -1:  # 返回所有关键点的两帧像素差坐标
+            return self.one_hand.wrist_npos_diff.copy()
+        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+
+    def angle_diff(self, point_id: int = -1) -> np.ndarray:
+        """获取对应名字的手部关键点弧度制角度差,其中指尖和手腕没有角度数据
+        Args:
+            point_id: 关键点编号,默认值-1则返回所有角度差
+        """
+        finger_id, angle_id = divmod(point_id, 4)  # 计算关键点对应的角度数组中的索引
+        if 20 >= point_id > 0 and angle_id != 0:  # 指尖和手腕没有角度数据
+            return self.one_hand.angle_diff[finger_id, (angle_id - 1)].copy()
+        elif point_id == -1:  # 没有输入point_id则返回全部角度差
+            return self.one_hand.angle_diff.copy()
+        raise ValueError(f"There is no angle data with point_id {point_id}")
+
+
+class HandDataAPI:
+    __slots__ = "one_hand"
+
+    def __init__(self, one_hand: OneHand) -> None:
+        self.one_hand: OneHand = one_hand
+
+    def norm_pos(self) -> np.ndarray:
+        """获取对应名字的手部的所有连续型数据的数组"""
+        return self.one_hand.pos_data
+
+    def norm_pos2DataFrame(self) -> DataFrame:
+        """获取对应名字的手部的所有连续型数据的DataFrame格式的数据"""
+        return DataFrame(self.one_hand.pos_data, columns=HAND_DATA_COL_NAME.iloc[:63])
+
+    def finger(self) -> np.ndarray:
+        """获取对应名字的手部的手指角度和指尖距离数据的数组"""
+        return self.one_hand.finger_data
+
+    def finger2DataFrame(self) -> DataFrame:
+        """获取对应名字的手部的手指角度和指尖距离数据的DataFrame格式的数据"""
+        return DataFrame(
+            self.one_hand.finger_data, columns=HAND_DATA_COL_NAME.iloc[63:]
+        )
+
+    def all_data(self) -> np.ndarray:
+        """获取对应名字的手部的所有连续型数据的数组"""
+        return self.one_hand.data
+
+    def all2DataFrame(self) -> DataFrame:
+        """获取对应名字的手部的所有连续型数据的DataFrame格式的数据"""
+        return DataFrame(self.one_hand.data, columns=HAND_DATA_COL_NAME)
+
+
+class HandAPI:
+    __slots__ = "one_hand", "_base", "_data", "_gestrue", "_drawing"
+
+    def __init__(self, one_hand: OneHand):
+        self.one_hand = one_hand
+        self._base: BaseHandAPI = BaseHandAPI(self.one_hand)
+        self._data: HandDataAPI = HandDataAPI(self.one_hand)
+        self._gestrue: Gestrue = Gestrue(self.one_hand)
+        self._drawing: HandDrawing = HandDrawing(self.one_hand)
+
+    @property
+    def base(self) -> BaseHandAPI:
+        return self._base
+
+    @property
+    def data(self) -> HandDataAPI:
+        return self._data
+
+    @property
+    def gestrue(self) -> Gestrue:
+        return self._gestrue
+
+    @property
+    def drawing(self) -> HandDrawing:
+        return self._drawing
 
 
 class HandInput:
-    __slots__ = "hands_dict", "detector", "columns_name"
+    __slots__ = (
+        "hands_dict",
+        "hands_api",
+        "detector",
+        "detected_name_ls",
+        "image",
+    )
 
     def __init__(
         self,
@@ -19,241 +210,61 @@ class HandInput:
         self.hands_dict: dict[str, OneHand] = {
             name: OneHand() for name in hands_name_ls
         }
+        self.hands_api: dict[str, HandAPI] = {
+            name: HandAPI(hand) for name, hand in self.hands_dict.items()
+        }
         # 根据传入的检测器类创建视觉手部检测器实例,添加手部名字列表的数量参数
         detector_kwargs["max_num_hands"] = len(hands_name_ls)
         self.detector: VisualHandDetector = hands_detector(**detector_kwargs)
-        # 定义集成数据之后的列名
-        self.columns_name: Series = Series(
-            (
-                "norm_pos0_x",
-                "norm_pos0_y",
-                "norm_pos0_z",
-                "norm_pos1_x",
-                "norm_pos1_y",
-                "norm_pos1_z",
-                "norm_pos2_x",
-                "norm_pos2_y",
-                "norm_pos2_z",
-                "norm_pos3_x",
-                "norm_pos3_y",
-                "norm_pos3_z",
-                "norm_pos4_x",
-                "norm_pos4_y",
-                "norm_pos4_z",
-                "norm_pos5_x",
-                "norm_pos5_y",
-                "norm_pos5_z",
-                "norm_pos6_x",
-                "norm_pos6_y",
-                "norm_pos6_z",
-                "norm_pos7_x",
-                "norm_pos7_y",
-                "norm_pos7_z",
-                "norm_pos8_x",
-                "norm_pos8_y",
-                "norm_pos8_z",
-                "norm_pos9_x",
-                "norm_pos9_y",
-                "norm_pos9_z",
-                "norm_pos10_x",
-                "norm_pos10_y",
-                "norm_pos10_z",
-                "norm_pos11_x ",
-                "norm_pos11_y",
-                "norm_pos11_z",
-                "norm_pos12_x",
-                "norm_pos12_y",
-                "norm_pos12_z",
-                "norm_pos13_x",
-                "norm_pos13_y",
-                "norm_pos13_z ",
-                "norm_pos14_x",
-                "norm_pos14_y",
-                "norm_pos14_z",
-                "norm_pos15_x",
-                "norm_pos15_y",
-                "norm_pos15_z",
-                "norm_pos16_x",
-                "norm_pos16_y ",
-                "norm_pos16_z",
-                "norm_pos17_x",
-                "norm_pos17_y",
-                "norm_pos17_z",
-                "norm_pos18_x",
-                "norm_pos18_y",
-                "norm_pos18_z",
-                "norm_pos19_x ",
-                "norm_pos19_y",
-                "norm_pos19_z",
-                "norm_pos20_x",
-                "norm_pos20_y",
-                "norm_pos20_z",
-                "p1_angle",
-                "p2_angle",
-                "p3_angle",
-                "p5_angle",
-                "p6_angle",
-                "p7_angle",
-                "p9_angle",
-                "p10_angle",
-                "p11_angle",
-                "p13_angle",
-                "p14 _angle",
-                "p15_angle",
-                "p17_angle",
-                "p18_angle",
-                "p19_angle",
-                "pos8_2thumb",
-                "pos12_2thumb",
-                "pos16_2thumb",
-                "pos20_2thumb",
-            )
-        )
+        # 创建一个用于记录本次检测到的手部的名称的列表
+        self.detected_name_ls: list[str] = []
+        # 记录每帧的图像
+        self.image: None | np.ndarray = None
 
     def detect(self, image: np.ndarray) -> list[str]:
+        """运行手部关键点检测器,返回成功检测到的手部名称
+        Args:
+            image: 输入需要检测的图像
         """
-        运行手部关键点检测器
-        检测成功则返回成功检测到的手部的名称
-        没有检测到手部或检测失败则返回空列表
-        """
-        # 获取检测结果
-        return self.detector.detect(image, self.hands_dict)
+        self.image = image  # 更新帧图像变量
+        self.detected_name_ls = self.detector.detect(image, self.hands_dict)
+        return self.detected_name_ls
 
-    def get_hand_img(
-        self, name: str, original_img: np.ndarray, padx: int = 10, pady: int = 10
-    ) -> np.ndarray | None:
+    def hand(self, name: str) -> HandAPI:
+        """指定相应的手部,返回对应手部的API
+        Args:
+            name: 输入手部名称
         """
-        截取对应名字的手部图片
-        返回截取后的图片
-        """
-        x0, y0, x1, y1 = self.get_hand_box(name)  # 获取手部矩形框
-        x0 -= padx  # 设置边缘
-        x1 += padx
-        y0 -= pady
-        y1 += pady
-        # 保证xxyy都为正整数
-        x0, y0, x1, y1 = map(lambda x: x if x >= 0 else 0, (x0, y0, x1, y1))
-        # 保证所裁切出来的图片有效
-        if x0 == x1 or y0 == y1:
-            return None
-        return original_img[y0:y1, x0:x1, :]
+        # 检查指定的手部是否有检测到
+        if name not in self.detected_name_ls:
+            raise ValueError(f"No hand keypoint named {name} was detected")
+        return self.hands_api[name]
 
-    def get_hand_box(self, name: str) -> tuple[int, int, int, int]:
+    def Base(self, name: str) -> BaseHandAPI:
+        """获取基础的手部数据
+        Args:
+            name: 输入手部名称
         """
-        获取对应名字的手部最小矩形框的在图片中的xxyy坐标
-        """
-        return self.hands_dict[name].box
+        return self.hand(name).base
 
-    def get_img_pos(self, name: str, point_id: int = -1) -> np.ndarray:
+    def Data(self, name: str) -> HandDataAPI:
+        """获取一维的手部相关数据
+        Args:
+            name: 输入手部名称
         """
-        获取名字为name的手部的第point_id个关键点在图片中的像素坐标
-        name: 输入手部名称
-        point_id: 输入关键点编号,默认值-1则返回所有关键点的像素坐标
-        """
-        one_hand = self.hands_dict[name]
-        if 20 >= point_id >= 0:  # 返回指定关键点的像素坐标
-            return one_hand.raw_pos[point_id, :2].astype(np.int32)
-        elif point_id == -1:  # 返回所有关键点的像素坐标
-            return one_hand.raw_pos[:, :2].astype(np.int32)
-        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+        return self.hand(name).data
 
-    def get_norm_pos(self, name: str, point_id: int = -1) -> np.ndarray:
+    def Gestrue(self, name: str) -> Gestrue:
+        """获取手势相关数据
+        Args:
+            name: 输入手部名称
         """
-        获取名字为name的手部的第point_id个关键点的xyz归一化坐标
-        name: 输入手部名称
-        point_id: 输入关键点编号,默认值-1则返回所有关键点的归一化坐标
-        """
-        one_hand = self.hands_dict[name]
-        if 20 >= point_id >= 0:  # 返回指定的关键点归一化坐标
-            return one_hand.norm_pos[point_id, :]
-        elif point_id == -1:  # 返回该手部所有的关键点的归一化坐标
-            return one_hand.norm_pos[:, :]  # 返回nrom_pos的副本,防止原来的数据被修改
-        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+        return self.hand(name).gestrue
 
-    def get_delta_img_pos(self, name: str, point_id: int = -1) -> np.ndarray:
+    def Drawing(self, name: str) -> HandDrawing:
+        """获取手部绘制工具
+        Args:
+            name: 输入手部名称
         """
-        获取名字为name的手部的第point_id个关键点两帧差的像素坐标
-        name: 输入手部名称
-        point_id: 输入关键点编号,默认值-1则返回所有关键点两帧差的像素坐标
-        """
-        one_hand = self.hands_dict[name]
-        if 20 >= point_id >= 0:  # 返回指定关键点的两帧像素差坐标
-            return one_hand.delta_pos[point_id, :]
-        elif point_id == -1:  # 返回所有关键点的两帧像素差坐标
-            return one_hand.delta_pos[:, :]
-        raise ValueError(f"There is no coordinate data with point_id {point_id}")
-
-    def get_norm2img_pos(
-        self,
-        name: str,
-        point_id: int = -1,
-        img_w: int = 100,
-        img_h: int = 100,
-        padx: int = 10,
-        pady: int = 10,
-    ) -> np.ndarray:
-        """
-        将归一化后的坐标转化为特定大小的图片位置坐标
-        """
-        npos = self.get_norm_pos(name, point_id)
-        npos[:, 0] = npos[:, 0] * (img_w - (2 * padx)) + padx
-        npos[:, 1] = npos[:, 1] * (img_h - (2 * pady)) + pady
-        return npos
-
-    def get_angle(self, name: str, point_id: int = -1) -> np.ndarray:
-        """
-        获取对应名字的手部关键点弧度制角度
-        其中指尖和手腕没有角度数据
-        """
-        one_hand = self.hands_dict[name]
-        finger_id, angle_id = divmod(point_id, 4)  # 计算关键点对应的角度数组中的索引
-        if 20 >= point_id > 0 and angle_id != 0:  # 指尖和手腕没有角度数据
-            return one_hand.fingers_angle[finger_id, (angle_id - 1)]
-        elif point_id == -1:  # 没有输入point_id则返回全部角度
-            return one_hand.fingers_angle[:, :]
-        raise ValueError(f"There is no angle data with point_id {point_id}")
-
-    def get_delta_angle(self, name: str, point_id: int = -1) -> np.ndarray:
-        """
-        获取对应名字的手部关键点弧度制角度差
-        其中指尖和手腕没有角度数据
-        """
-        one_hand = self.hands_dict[name]
-        finger_id, angle_id = divmod(point_id, 4)  # 计算关键点对应的角度数组中的索引
-        if 20 >= point_id > 0 and angle_id != 0:  # 指尖和手腕没有角度数据
-            return one_hand.delta_angle[finger_id, (angle_id - 1)]
-        elif point_id == -1:  # 没有输入point_id则返回全部角度差
-            return one_hand.delta_angle[:, :]
-        raise ValueError(f"There is no angle data with point_id {point_id}")
-
-    def get_thumb_dist(self, name: str, other_point_id: int = -1) -> np.ndarray:
-        """
-        获取对应名字的手部的从拇指到其他手指关键点的曼哈顿距离
-        """
-        one_hand = self.hands_dict[name]
-        if other_point_id in (8, 12, 16, 20):
-            # 计算对应的数组的索引
-            finger_id, knuckle_id = divmod(other_point_id, 4)
-            arr_id = (knuckle_id - 1) if knuckle_id != 0 else (finger_id + 1)
-            return one_hand.thumb_dist[arr_id]
-        elif other_point_id == -1:  # 没有输入id则返回全部到拇指的距离
-            return one_hand.thumb_dist[:]
-        raise ValueError(f"There is no distance data with point_id {other_point_id}")
-
-    def get_hand_data(self, name: str | None = None) -> np.ndarray:
-        """
-        获取对应名字的手部的所有连续型数据的数组
-        """
-        if name is None:  # name没有填入参数,则返回全部手部数据
-            return np.vstack(
-                [self.hands_dict[n].data.reshape(1, -1) for n in self.hands_dict.keys()]
-            )
-        # 返回对应名字的手部数据
-        one_hand = self.hands_dict[name]
-        return one_hand.data.reshape(1, -1)
-
-    def get_hand_DataFrame(self, name: str | None = None) -> DataFrame:
-        """
-        获取对应名字的手部的所有连续型数据的DataFrame格式的数据
-        """
-        return DataFrame(self.get_hand_data(name), columns=self.columns_name)
+        self.hand(name).drawing.raw_img = self.image
+        return self.hand(name).drawing

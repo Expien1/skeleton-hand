@@ -18,10 +18,11 @@ class MediaPipeHandDetector(VisualHandDetector):
         min_track_confi: float = 0.6,
     ):
         """
-        static_image_mode:使用静态检测模式,False为使用动态
-        max_num_hands: 最大检测到的手的数量
-        min_detect_confi: 检测手部的置信度
-        min_track_confi: 跟踪手部的置信度
+        Args:
+            static_image_mode: 使用静态检测模式,False为使用动态
+            max_num_hands: 最大检测到的手的数量
+            min_detect_confi: 检测手部的置信度
+            min_track_confi: 跟踪手部的置信度
         """
         super().__init__(max_num_hands)
         # 初始化手部检测器
@@ -77,10 +78,6 @@ class MediaPipeHandDetector(VisualHandDetector):
             x = int(landmark.x * img_w)
             y = int(landmark.y * img_h)
             one_hand.raw_pos[id, :] = x, y, landmark.z
-        # z轴用归一化坐标表示
-        min_z = one_hand.raw_pos[:, 2].min()
-        max_z = one_hand.raw_pos[:, 2].max()
-        one_hand.raw_pos[:, 2] = (one_hand.raw_pos[:, 2] - min_z) / (max_z - min_z)
         # 将原始数据处理完毕后,调用OneHand中的update方法计算并更新所有手部数据
         one_hand.reset_all_flags()
         return one_hand.raw_pos
