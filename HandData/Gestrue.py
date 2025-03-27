@@ -21,6 +21,11 @@ class Gestrue:
         one_hand: OneHand,
         interval_time: float = 0.3,
     ) -> None:
+        """调用手势识别模型API
+        Args:
+            one_hand: 输入基本的手部数据实例
+            interval_time: 调用模型的间隔时间
+        """
         self.one_hand: OneHand = one_hand
         # 间隔调用参数
         self.interval_time: float = interval_time
@@ -47,7 +52,6 @@ class Gestrue:
             raise ValueError(f"There is no finger with index {idx}")
         # 计算当前间隔时间
         cur_interval = time() - self.fom_interval_timer[idx]
-        print("cur", cur_interval)
         # 长间隔时间:模型输出结果没有变化
         if cur_interval > self.interval_time:
             self.fom_interval_timer[idx] = time()  # 更新计时器

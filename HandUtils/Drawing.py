@@ -86,7 +86,7 @@ class HandDrawing:
         """重置帧图像,将帧图像设为None"""
         self.raw_img = None
 
-    def set_para(
+    def set_param(
         self,
         *,
         point_radius: int = 4,
@@ -165,7 +165,7 @@ class HandDrawing:
         if self.raw_img is None:
             return None
         # 设置绘制相关参数
-        self.set_para(
+        self.set_param(
             point_radius=point_radius,
             point_color=point_color,
             point_thickness=point_thickness,

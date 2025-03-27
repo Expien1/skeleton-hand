@@ -1,3 +1,4 @@
+from typing import Literal
 import numpy as np
 
 from ..HandUtils.Filter import AdaptiveEWMAFilter
@@ -6,8 +7,9 @@ from ._global import T_NORM2WRIST, T_NORM2VEC
 
 class OneHand:
     __slots__ = (
-        "is_left",
+        "hand_side",
         "raw_pos",
+        "last_rpos",
         "_norm_pos",
         "_box",
         "_normalized_flag",
@@ -24,7 +26,7 @@ class OneHand:
         "_finger_data",
         "_finger_data_flag",
         "_wrist_npos_diff",
-        "_last_pos",
+        "last_wnpos",
         "wrist_npos_diff_filter",
         "_wrist_npos_diff_flag",
         "_angle_diff",
@@ -34,11 +36,12 @@ class OneHand:
 
     def __init__(self):
         """一只手的关键点位置数据"""
-        # 用一个bool值记录当前手是左手还是右手
-        self.is_left: bool = False  # 初始值为右手
+        # 用记录当前手是左手还是右手,默认为未知
+        self.hand_side: Literal["left", "right", "Unknown"] = "Unknown"
         # 定义一个21x3的全0的二维数组来接收返回的21个手部关键点的xyz坐标
         # raw_pos表示这是原始传入的手部关键点的位置,初始创建一个空的数组,里面初始值是脏数据
         self.raw_pos: np.ndarray = np.zeros((21, 3), dtype=np.float32)
+        self.last_rpos: np.ndarray = self.raw_pos.copy()
         # norm_pos表示是再手部box里归一化之后的坐标点坐标
         self._norm_pos: np.ndarray = np.zeros((21, 3), dtype=np.float32)
         # 手部矩形框的四个坐标点,分别为左上角坐标和右下角坐标
@@ -71,7 +74,7 @@ class OneHand:
         self._finger_data_flag: bool = False
         # 创建一个21x3的二维数组来存储每个关键点的移动差值
         self._wrist_npos_diff: np.ndarray = np.zeros(21, dtype=np.float32)
-        self._last_pos: np.ndarray = self._wrist_npos.copy()
+        self.last_wnpos: np.ndarray = self._wrist_npos.copy()
         # 创建滤波器对关键点两帧间的位移进行滤波
         self.wrist_npos_diff_filter: AdaptiveEWMAFilter = AdaptiveEWMAFilter(0.08, 0.5)
         # 标志当前_wrist_npos_diff变量存的是否为最新的速度
@@ -211,7 +214,7 @@ class OneHand:
     def integrate_data(self) -> np.ndarray:
         """整合所有手部相关数据并输出为一维数组"""
         self._data = self.norm_pos.copy()
-        if self.is_left:  # 将关键点数据统一成右手数据
+        if self.hand_side != "right":  # 将关键点数据统一成右手数据
             self._data[:, 0] = 1 - self.norm_pos[:, 0]
         # 将数据展平然后合并
         self._data = np.ravel(self._data, order="C")
@@ -250,9 +253,11 @@ class OneHand:
         if not self._wrist_npos_diff_flag:
             # 计算上次和本次的手部关键点距离
             self._wrist_npos_diff[:] = self.wrist_npos_diff_filter(
-                np.linalg.norm(self.wrist_npos - self._last_pos, ord=1, axis=1)
+                np.linalg.norm(
+                    self.wrist_npos[:, :2] - self.last_wnpos[:, :2], ord=1, axis=1
+                )
             )
-            self._last_pos[:, :] = self.wrist_npos  # 记录本次关键点位置
+            self.last_wnpos[:, :] = self.wrist_npos  # 记录本次关键点位置
             self._wrist_npos_diff_flag = True
         return self._wrist_npos_diff
 
