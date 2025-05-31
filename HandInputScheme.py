@@ -1,8 +1,19 @@
+from abc import abstractmethod
 from time import time
 
 import numpy as np
 
 from .HandInput import HandInput
+
+
+class HIScheme:
+    @abstractmethod
+    def update(self):
+        pass
+
+    @abstractmethod
+    def run(self):
+        pass
 
 
 class FingerButton:
@@ -12,6 +23,12 @@ class FingerButton:
         short_press_time: float = 0.1,
         long_press_time: float = 0.3,
     ) -> None:
+        """手指按钮操控方案
+        Args:
+            hand_input: 手部输入类的实例
+            short_press_time: 短按时间阈值,即短按的触发时间
+            long_press_time: 长按时间阈值,即长按的触发时间
+        """
         self.hand_input: HandInput = hand_input
         self.short_press_time: float = short_press_time
         self.long_press_time: float = long_press_time
@@ -78,6 +95,10 @@ class FingerButton:
 
 class ThumbJoystick:
     def __init__(self, hand_input: HandInput) -> None:
+        """拇指摇杆操控方案
+        Args:
+            hand_input: 手部输入类的实例
+        """
         self.hand_input: HandInput = hand_input
         self.fixed_point: np.ndarray | None = None
 

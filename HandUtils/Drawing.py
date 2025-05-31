@@ -8,36 +8,50 @@ class HandImage:
     __slots__ = "data", "_size", "_padding"
 
     def __init__(self, data: np.ndarray, padx: int = 0, pady: int = 0) -> None:
+        """用于方便绘制归一化后的手部数据的背景图片类
+        Args:
+            data: 图片的ndarray
+            padx: 手部数据在x轴上绘制的最大边界
+            pady: 手部数据在y轴上绘制的最大边界
+        """
         self.data: np.ndarray = data
         self._size: np.ndarray = np.array((self.width, self.height))
         self._padding: np.ndarray = np.array((padx, pady))
 
     @property
     def width(self) -> int:
+        """获取图片的宽"""
         return self.data.shape[1]
 
     @property
     def height(self) -> int:
+        """获取图片的高"""
         return self.data.shape[0]
 
     @property
     def size(self) -> np.ndarray:
+        """获取图片的宽和高,返回ndarray格式的数据"""
         return self._size
 
     @property
     def padding(self) -> np.ndarray:
+        """获取x轴和y轴的最大边界,返回ndarray格式的数据"""
         return self._padding
 
     def calc_norm2img_pos(self, norm_pos: np.ndarray) -> np.ndarray:
+        """计算归一化后的手部数据在图片上的位置坐标
+        Args:
+            norm_pos: 归一化后的手部数据
+        """
+        # 保证输入的手部归一化数据是二维平面的坐标数据
         if len(norm_pos.shape) == 1 and norm_pos.shape[0] > 2:
             norm_pos = norm_pos[:2]
+        # 计算在图片上的位置坐标
         img_pos = (norm_pos * (self._size - (2 * self._padding))) + self._padding
         return img_pos.astype(np.int32)
 
 
 class HandBackground(HandImage):
-    __slots__ = ()
-
     def __init__(
         self,
         width: int,
@@ -46,6 +60,14 @@ class HandBackground(HandImage):
         padx: int = 0,
         pady: int = 0,
     ) -> None:
+        """纯色背景图片
+        Args:
+            width: 背景宽度
+            height: 背景高度
+            color: 背景颜色
+            padx: 手部数据在x轴上绘制的最大边界
+            pady: 手部数据在y轴上绘制的最大边界
+        """
         # 创建纯色背景图
         data = np.empty((height, width, 3), dtype=np.uint8)
         data[:, :, :] = color
@@ -146,6 +168,7 @@ class HandDrawing:
 
     def draw_hand(
         self,
+        image: np.ndarray | None = None,
         *,
         point_radius: int = 4,
         point_color: tuple[int, int, int] = (255, 255, 255),
@@ -155,6 +178,7 @@ class HandDrawing:
     ) -> None | np.ndarray:
         """在原图中绘制手部,可同时设置手部绘制相关参数
         Args:
+            image: 传入图片,将手部绘制到该图片上
             point_radius: 关键点半径
             point_color: 关键点颜色
             point_thickness: 关键点粗细
@@ -172,6 +196,10 @@ class HandDrawing:
             line_color=line_color,
             line_thickness=line_thickness,
         )
+        # 默认是在原图里绘制
+        output_img = self.raw_img
+        if image is not None:
+            output_img = image
         # 绘制
         x0, y0 = self.one_hand.raw_pos[0, :2].astype(np.int32)
         xp, yp = x0, y0
@@ -188,18 +216,18 @@ class HandDrawing:
                 )
             )
             cv2.circle(
-                self.raw_img, (xi, yi), self.point_radius, z_color, self.point_thickness
+                output_img, (xi, yi), self.point_radius, z_color, self.point_thickness
             )
             # 绘制手部连线
-            cv2.line(self.raw_img, (xp, yp), (xi, yi), z_color, self.line_thickness)
+            cv2.line(output_img, (xp, yp), (xi, yi), z_color, self.line_thickness)
             if i % 4 == 0:
                 xp, yp = x0, y0
             else:
                 xp, yp = xi, yi
-        return self.raw_img
+        return output_img
 
     def get_hand_img(self, *, padx: int = 0, pady: int = 0) -> None | np.ndarray:
-        """截取并返回对应名字的手部图片
+        """截取对应名字的手部图片
         Args:
             padx: 横坐标方向的填充像素大小
             pady: 纵坐标方向的填充像素大小
@@ -218,11 +246,28 @@ class HandDrawing:
             raise ValueError("It can't cut out a valid picture.")
         return self.raw_img[y0:y1, x0:x1, :].copy()
 
-    def draw_norm_on_bg(self, bg_img: HandImage) -> np.ndarray:
+    def draw_hand_only(self, *, padx: int = 0, pady: int = 0) -> None | np.ndarray:
+        """截取并绘制对应名字的手部图片
+        Args:
+            padx: 横坐标方向的填充像素大小
+            pady: 纵坐标方向的填充像素大小
+        """
+        # 检查是否存在有图像
+        hand_only_img = self.get_hand_img(padx=padx, pady=pady)
+        if hand_only_img is None:
+            return None
+        # 统一边界大小
+        hand_only_img = HandImage(hand_only_img, padx, pady)
+        return self.draw_norm_hand(hand_only_img)
+
+    def draw_norm_hand(self, bg_img: HandImage | np.ndarray) -> np.ndarray:
         """绘制归一化后的手部坐标
         Args:
             bg_img: 背景图片,需要传入HandImage实例
         """
+        # 如果传入的是ndarray的话,需要转为HandImage类实例
+        if isinstance(bg_img, np.ndarray):
+            bg_img = HandImage(bg_img)
         x0, y0 = bg_img.calc_norm2img_pos(self.one_hand.norm_pos[0, :2])
         xp, yp = x0, y0
         for i in range(21):

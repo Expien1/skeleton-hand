@@ -1,6 +1,6 @@
 from time import time
 import numpy as np
-from .FingerModels import out_model, touch_model
+from .FingerModels import out_model, touch_model, close_model
 from .OneHand import OneHand
 
 
@@ -38,6 +38,7 @@ class Gestrue:
         # 检测手指是否合拢
         self.fcm_output: np.ndarray = np.zeros(4, dtype=np.bool_)
         self.fcm_interval_timer: list[float] = [0 for _ in range(4)]
+        # self.fcm_interval_timer: np.ndarray = np.zeros(4, dtype=np.float32)
 
     @property
     def fg_all_out(self) -> np.ndarray:
@@ -47,7 +48,10 @@ class Gestrue:
         return self.fom_output
 
     def get_fg_out(self, idx: int) -> np.ndarray:
-        """检测指定索引的手指是否伸出"""
+        """检测指定索引的手指是否伸出
+        Args:
+            idx: 0到4分别为大拇指,食指,中指,无名指,小拇指
+        """
         if idx < 0 or idx > 4:
             raise ValueError(f"There is no finger with index {idx}")
         # 计算当前间隔时间
@@ -92,7 +96,10 @@ class Gestrue:
         return self.ftm_output
 
     def get_fg_touch(self, idx: int) -> np.ndarray:
-        """检测指定索引的手指指尖是否触碰大拇指指尖"""
+        """检测指定索引的手指指尖是否触碰大拇指指尖
+        Args:
+            idx: 0到3分别为大拇指到食指/中指/无名指/小拇指指尖的索引
+        """
         if idx < 0 or idx > 3:
             raise ValueError(f"There is no finger with index {idx}")
         # 计算当前间隔时间
@@ -134,7 +141,10 @@ class Gestrue:
         return self.fcm_output
 
     def get_fg_close(self, idx: int) -> np.ndarray:
-        """检测指定索引的手指之间是否并拢"""
+        """检测指定索引的手指之间是否并拢
+        Args:
+            idx: 0到3分别为大拇指和食指并拢,食指和中指并拢...的索引
+        """
         if idx < 0 or idx > 3:
             raise ValueError(f"There is no finger with index {idx}")
         # 计算当前间隔时间
@@ -143,9 +153,7 @@ class Gestrue:
         if cur_interval > self.interval_time:
             self.fcm_interval_timer[idx] = time()  # 更新计时器
             # 调用模型进行推理
-            self.fcm_output[idx] = touch_model.run_by_idx(
-                idx, self.one_hand.finger_data
-            )
+            self.fcm_output[idx] = close_model.run_by_idx(idx, self.one_hand.pos_data)
         return self.fcm_output[idx]
 
     @property

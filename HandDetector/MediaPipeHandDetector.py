@@ -19,14 +19,14 @@ class MediaPipeHandDetector(VisualHandDetector):
         min_detect_confi: float = 0.8,
         min_track_confi: float = 0.6,
     ):
-        """
+        """MediaPipe手部关键点检测器
         Args:
             hands_name_ls: 需要被检测到的手部名字列表
-            hands_matcher: 创建手部匹配器
-            以下为手部检测器的参数
-            static_image_mode: 使用静态检测模式,False为使用动态
-            min_detect_confi: 检测手部的置信度
-            min_track_confi: 跟踪手部的置信度
+            hands_matcher: 手部匹配器,用于匹配/追踪多只手部的名字
+                以下为手部检测器VisualHandDetector的参数
+                static_image_mode: 使用静态检测模式,False为使用动态
+                min_detect_confi: 检测手部的置信度
+                min_track_confi: 跟踪手部的置信度
         """
         super().__init__(hands_name_ls, hands_matcher)
         self.hands_name_ls: list[str] = hands_name_ls

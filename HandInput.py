@@ -18,7 +18,7 @@ class BaseHandAPI:
 
     def __init__(self, one_hand: OneHand) -> None:
         self.one_hand: OneHand = one_hand
-        # 记录帧间时间
+        # 记录帧间时间,初始值为1
         self.delta_time: float = 1
 
     def hand_side(self) -> str:
@@ -36,30 +36,36 @@ class BaseHandAPI:
             return self.one_hand.raw_pos[:, :2].astype(np.int32)
         raise ValueError(f"No coordinate data with point_id {point_id}")
 
-    def norm_pos(self, point_id: int = -1) -> np.ndarray:
+    def norm_pos(self, point_id: int = -1, copy: bool = True) -> np.ndarray:
         """获取名为name的手部的索引为point_id的以手部矩形框左上角为原点的归一化xyz坐标
         Args:
             point_id: 关键点编号;默认值-1返回所有关键点的归一化坐标
+            copy: 是否返回副本,默认为True返回副本,注意:若为False,请不要修改该值,这是只读的
         """
         if 20 >= point_id >= 0:  # 返回指定的关键点归一化坐标
-            return self.one_hand.norm_pos[point_id, :].copy()
+            output = self.one_hand.norm_pos[point_id, :]
         elif point_id == -1:  # 返回该手部所有的关键点的归一化坐标
-            # 返回nrom_pos的副本,防止原来的数据被修改
-            return self.one_hand.norm_pos.copy()
-        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+            output = self.one_hand.norm_pos
+        else:
+            raise ValueError(f"There is no coordinate data with point_id {point_id}")
+        # 返回nrom_pos的副本,防止原来的数据被修改
+        return output.copy() if copy else output
 
-    def wrist_npos(self, point_id: int = -1) -> np.ndarray:
+    def wrist_npos(self, point_id: int = -1, copy: bool = True) -> np.ndarray:
         """获取名为name的手部的索引为point_id的以手腕为原点的归一化xyz坐标
         Args:
             point_id: 关键点编号;默认值-1返回所有关键点的以手腕为原点的归一化坐标
+            copy: 是否返回副本,默认为True返回副本,注意:若为False,请不要修改该值,这是只读的
         """
         if 20 >= point_id > 0:  # 返回指定的关键点归一化坐标
-            return self.one_hand.wrist_npos[point_id, :].copy()
+            output = self.one_hand.wrist_npos[point_id, :]
+        elif point_id == -1:  # 返回该手部所有的关键点的归一化坐标
+            output = self.one_hand.wrist_npos
         elif point_id == 0:  # 以手腕坐标为原点,直接返回原点坐标000
             return np.array([0, 0, 0], dtype=np.float32)
-        elif point_id == -1:  # 返回该手部所有的关键点的归一化坐标
-            return self.one_hand.wrist_npos.copy()
-        raise ValueError(f"There is no coordinate data with point_id {point_id}")
+        else:
+            raise ValueError(f"There is no coordinate data with point_id {point_id}")
+        return output.copy() if copy else output
 
     def norm2img_pos(
         self,
@@ -91,31 +97,39 @@ class BaseHandAPI:
         """获取对应名字的手部最小矩形框的在图片中的xyxy像素坐标"""
         return self.one_hand.box
 
-    def finger_angle(self, point_id: int = -1) -> np.ndarray:
+    def finger_angle(self, point_id: int = -1, copy: bool = True) -> np.ndarray:
         """获取对应名字的手部关键点弧度制角度,其中指尖和手腕没有角度数据
         Args:
             point_id: 关键点编号;默认值-1返回所有手指关节点角度数据
+            copy: 是否返回副本,默认为True返回副本,注意:若为False,请不要修改该值,这是只读的
         """
         finger_id, angle_id = divmod(point_id, 4)  # 计算关键点对应的角度数组中的索引
         if 20 >= point_id > 0 and angle_id != 0:  # 指尖和手腕没有角度数据
-            return self.one_hand.fingers_angle[finger_id, (angle_id - 1)].copy()
+            output = self.one_hand.fingers_angle[finger_id, (angle_id - 1)]
         elif point_id == -1:  # 没有输入point_id则返回全部角度
-            return self.one_hand.fingers_angle.copy()
-        raise ValueError(f"There is no angle data with point_id {point_id}")
+            output = self.one_hand.fingers_angle
+        else:
+            raise ValueError(f"There is no angle data with point_id {point_id}")
+        return output.copy() if copy else output
 
-    def thumb_dist(self, other_point_id: int = -1) -> np.ndarray:
+    def thumb_dist(self, other_point_id: int = -1, copy: bool = True) -> np.ndarray:
         """获取对应名字的手部的从大拇指到其他手指关键点的曼哈顿距离
         Args:
             point_id: 关键点编号;默认值-1返回4根指尖到大拇指指尖的距离
+            copy: 是否返回副本,默认为True返回副本,注意:若为False,请不要修改该值,这是只读的
         """
         if other_point_id in (8, 12, 16, 20):
             # 计算对应的数组的索引
             finger_id, knuckle_id = divmod(other_point_id, 4)
             arr_id = (knuckle_id - 1) if knuckle_id != 0 else (finger_id + 1)
-            return self.one_hand.thumb_dist[arr_id].copy()
+            output = self.one_hand.thumb_dist[arr_id]
         elif other_point_id == -1:  # 没有输入id则返回全部到拇指的距离
-            return self.one_hand.thumb_dist.copy()
-        raise ValueError(f"There is no distance data with point_id {other_point_id}")
+            output = self.one_hand.thumb_dist
+        else:
+            raise ValueError(
+                f"There is no distance data with point_id {other_point_id}"
+            )
+        return output.copy() if copy else output
 
     def wrist_npos_velocity(self, point_id: int = -1) -> np.ndarray:
         """获取名字为name的手部的第point_id个关键点两帧之间的归一化坐标差值
@@ -147,28 +161,34 @@ class HandDataAPI:
     def __init__(self, one_hand: OneHand) -> None:
         self.one_hand: OneHand = one_hand
 
+    @property
     def norm_pos(self) -> np.ndarray:
         """获取对应名字的手部的所有连续型数据的数组"""
         return self.one_hand.pos_data
 
+    @property
     def norm_pos2DataFrame(self) -> DataFrame:
         """获取对应名字的手部的所有连续型数据的DataFrame格式的数据"""
         return DataFrame(self.one_hand.pos_data, columns=HAND_DATA_COL_NAME.iloc[:63])
 
+    @property
     def finger(self) -> np.ndarray:
         """获取对应名字的手部的手指角度和指尖距离数据的数组"""
         return self.one_hand.finger_data
 
+    @property
     def finger2DataFrame(self) -> DataFrame:
         """获取对应名字的手部的手指角度和指尖距离数据的DataFrame格式的数据"""
         return DataFrame(
             self.one_hand.finger_data, columns=HAND_DATA_COL_NAME.iloc[63:]
         )
 
+    @property
     def all_data(self) -> np.ndarray:
         """获取对应名字的手部的所有连续型数据的数组"""
         return self.one_hand.data
 
+    @property
     def all2DataFrame(self) -> DataFrame:
         """获取对应名字的手部的所有连续型数据的DataFrame格式的数据"""
         return DataFrame(self.one_hand.data, columns=HAND_DATA_COL_NAME)
@@ -209,7 +229,7 @@ class HandInput:
         "detected_name_ls",
         "image",
         "_last_frame_time",
-        "delta_time",
+        "_delta_time",
     )
 
     def __init__(
@@ -234,9 +254,9 @@ class HandInput:
         self.detected_name_ls: list[str] = []
         # 记录每帧的图像
         self.image: None | np.ndarray = None
-        # 记录两帧之间的间隔时间
+        # 记录两帧之间的间隔时间,初始值为1
         self._last_frame_time: float = time()
-        self.delta_time: float = 1
+        self._delta_time: float = 1
 
     def detect(self, image: np.ndarray) -> list[str]:
         """运行手部关键点检测器,返回成功检测到的手部名称
@@ -244,12 +264,18 @@ class HandInput:
             image: 输入需要检测的图像
         """
         self.image = image  # 更新帧图像变量
+        # 检测并更新手部数据
         self.detected_name_ls = self.detector.detect(image, self.hands_dict)
         # 更新帧间时间
         cur_frame_time = time()
-        self.delta_time = cur_frame_time - self._last_frame_time
+        self._delta_time = cur_frame_time - self._last_frame_time
         self._last_frame_time = cur_frame_time
         return self.detected_name_ls
+
+    @property
+    def delta_time(self) -> float:
+        """返回两帧之间的间隔时间,初始值为1"""
+        return self._delta_time
 
     def hand(self, name: str) -> HandAPI | None:
         """指定相应的手部,返回对应手部的API,没有检测到的返回None
@@ -259,7 +285,6 @@ class HandInput:
         # 检查指定的手部是否有检测到
         if name not in self.detected_name_ls:
             return None
-            # raise ValueError(f"No hand keypoint named {name} was detected")
         return self.hands_api[name]
 
     def base(self, name: str) -> BaseHandAPI | None:
@@ -301,17 +326,26 @@ class HandInput:
         hand = self.hand(name)
         if hand is None:
             return None
-        hand.drawing.raw_img = self.image
+        hand.drawing.raw_img = self.image  # 设定原始图像
         return hand.drawing
+
+    def hand_unwrap(self, name: str) -> HandAPI:
+        """指定相应的手部,返回对应手部的API,没有检测到就抛出错误
+        Args:
+            name: 输入手部名称
+        """
+        # 检查指定的手部是否有检测到
+        if name not in self.detected_name_ls:
+            raise ValueError(f"No hand keypoint named {name} was detected")
+        return self.hands_api[name]
 
     def base_unwrap(self, name: str) -> BaseHandAPI:
         """获取基础的手部数据,没有检测到就抛出错误
         Args:
             name: 输入手部名称
         """
-        hand = self.hand(name)
-        if hand is None:
-            raise ValueError(f"No hand keypoint named {name} was detected")
+        hand = self.hand_unwrap(name)
+        hand.base.delta_time = self.delta_time  # 设定时间间隔
         return hand.base
 
     def data_unwrap(self, name: str) -> HandDataAPI:
@@ -319,28 +353,20 @@ class HandInput:
         Args:
             name: 输入手部名称
         """
-        hand = self.hand(name)
-        if hand is None:
-            raise ValueError(f"No hand keypoint named {name} was detected")
-        return hand.data
+        return self.hand_unwrap(name).data
 
     def gestrue_unwrap(self, name: str) -> Gestrue:
         """获取手势相关数据,没有检测到就抛出错误
         Args:
             name: 输入手部名称
         """
-        hand = self.hand(name)
-        if hand is None:
-            raise ValueError(f"No hand keypoint named {name} was detected")
-        return hand.gestrue
+        return self.hand_unwrap(name).gestrue
 
     def drawing_unwrap(self, name: str) -> HandDrawing:
         """获取手部绘制工具,没有检测到就抛出错误
         Args:
             name: 输入手部名称
         """
-        hand = self.hand(name)
-        if hand is None:
-            raise ValueError(f"No hand keypoint named {name} was detected")
-        hand.drawing.raw_img = self.image
+        hand = self.hand_unwrap(name)
+        hand.drawing.raw_img = self.image  # 设定原始图像
         return hand.drawing

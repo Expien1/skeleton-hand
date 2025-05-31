@@ -5,6 +5,10 @@ import numpy as np
 class HandsMatcher(ABC):
     @abstractmethod
     def __init__(self, matched_ls: list[str]):
+        """多手部匹配器,用于为检测到的多只手部匹配名字
+        Args:
+            matched_ls: 需要被匹配的手部名字列表
+        """
         self.matched_ls: list[str] = matched_ls
         self.n = len(matched_ls)
         self.row_n: int = 0  # 记录当前检测到的行/数量
@@ -12,12 +16,16 @@ class HandsMatcher(ABC):
 
     @abstractmethod
     def run(self, cost_matrix: np.ndarray) -> dict:
+        """运行匹配算法,返回匹配后的字典
+        Args:
+            cost_matrix: 未扩展的初始的成本矩阵,列数要和被检测手部数量相同
+        """
         return self.matched_dict
 
 
 class HungarianMatcher(HandsMatcher):
     def __init__(self, matched_ls: list[str]):
-        """
+        """用匈牙利算法为多只手部匹配名字
         Args:
             matched_ls: 需要被匹配的手部名字列表
         """
@@ -27,7 +35,7 @@ class HungarianMatcher(HandsMatcher):
         self.matched_dict: dict[int, str] = dict()
 
     def _extend2square(self, cost_matrix: np.ndarray) -> np.ndarray:
-        """用0行填充剩下没有检测到的手,扩展成方阵
+        """用0行填充剩下没有检测到的手,扩展成方阵,返回扩展后的成本矩阵(方阵)
         Args:
             cost_matrix: 未扩展的初始的成本矩阵,列数要和被检测手部数量相同
         """
@@ -49,7 +57,7 @@ class HungarianMatcher(HandsMatcher):
         cur_matrix -= col_mins
 
     def _find_0line(self, cur_matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """找到最优的零覆盖线,使用贪心策略
+        """用贪心策略找到最优的零覆盖线,返回标记了画线的行和列的布尔索引的元组
         Args:
             cur_matrix: 当前处理过之后的方阵
         """
@@ -89,8 +97,8 @@ class HungarianMatcher(HandsMatcher):
         # 对覆盖线交叉的位置进行加法,防止已有零被破坏
         cur_matrix[row_line, col_line] += uncovered_min
 
-    def _mark_in_zeros(self, cur_matrix: np.ndarray) -> dict[int, str]:
-        """标记独立零,通过找独立零来匹配两边的节点
+    def _mark_zeros(self, cur_matrix: np.ndarray) -> dict[int, str]:
+        """标记独立零,通过找独立零来匹配两边的节点,返回最终匹配后的字典
         Args:
             cur_matrix: 当前处理过之后的方阵
         """
@@ -112,7 +120,7 @@ class HungarianMatcher(HandsMatcher):
         return self.matched_dict
 
     def run(self, cost_matrix: np.ndarray) -> dict[int, str]:
-        """运行匈牙利算法,返回匹配后的字典
+        """运行匈牙利算法,返回匹配后的字典(键为检测到手部的索引,值为对应的名字)
         Args:
             cost_matrix: 未扩展的初始的成本矩阵,列数要和被检测手部数量相同
         """
@@ -128,7 +136,8 @@ class HungarianMatcher(HandsMatcher):
         while (row_line.sum() + col_line.sum()) < self.n:
             self._adjust_matrix(matrix, row_line, col_line)  # 调整矩阵
             row_line, col_line = self._find_0line(matrix)  # 更新覆盖线
-        return self._mark_in_zeros(matrix)
+        # 最后通过找独立零来匹配对应的名字
+        return self._mark_zeros(matrix)
 
 
 if __name__ == "__main__":

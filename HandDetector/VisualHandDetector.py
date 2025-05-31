@@ -7,16 +7,14 @@ from ..HandData.OneHand import OneHand
 
 
 class VisualHandDetector(ABC):
-    """基于视觉的手部关键点检测器"""
-
     __slots__ = "hands_name_ls", "_detector", "hands_matcher"
 
     @abstractmethod
     def __init__(self, hands_name_ls: list[str], hands_matcher: type[HandsMatcher]):
-        """
+        """视觉手部关键点检测器
         Args:
             hands_name_ls: 需要被检测到的手部名字列表
-            hands_matcher: 创建手部匹配器
+            hands_matcher: 手部匹配器,用于匹配/追踪多只手部的名字
         """
         # 创建手部关键点检测器
         self._detector = None
