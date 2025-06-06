@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skeleton-hand"
+version = "0.1.0"
+authors = [
+  { name="Expien1", email="lzhao2077@qq.com" },
+]
+description = "A comprehensive hand tracking and gesture recognition framework"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+]
+keywords = [
+  "hand tracking",
+  "gesture recognition",
+  "computer vision",
+  "machine learning",
+  "hand keypoints",
+]
+dependencies = [
+  "numpy>=2.0.2",
+  "pandas>=2.2.3",
+  "onnxruntime>=1.20.1",
+  "mediapipe>=0.10.14", 
+  #mediapipe库已经包含有opencv-contrib-pythono
+  #"opencv-python>=4.10.0.84",
+]
+
+[project.urls]
+Homepage = "https://github.com/Expien1/skeleton-hand"
+Issues = "https://github.com/Expien1/skeleton-hand/issues"
+
+[tool.setuptools]
+packages = [
+  "skhand",
+  "skhand.HandData",
+  "skhand.HandDetector",
+  "skhand.HandInputSchemes",
+  "skhand.HandUtils"
+]
+package-dir = { "skhand" = "src/skhand" }
+
+[tool.setuptools.package-data]
+"skhand.HandData" = ["models/*.onnx"]
+
+[tool.setuptools.dynamic]
+version = { attr = "skhand.__version__" }
+
