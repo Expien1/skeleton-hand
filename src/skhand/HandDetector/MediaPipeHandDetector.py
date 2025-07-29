@@ -23,7 +23,7 @@ class MediaPipeHandDetector(VisualHandDetector):
         Args:
             hands_name_ls: 需要被检测到的手部名字列表
             hands_matcher: 手部匹配器,用于匹配/追踪多只手部的名字
-                以下为手部检测器VisualHandDetector的参数
+                以下为手部检测器MediaPipeHandDetector的参数
                 static_image_mode: 使用静态检测模式,False为使用动态
                 min_detect_confi: 检测手部的置信度
                 min_track_confi: 跟踪手部的置信度
@@ -41,6 +41,12 @@ class MediaPipeHandDetector(VisualHandDetector):
         self.hands_matcher: HandsMatcher = hands_matcher(hands_name_ls)
         # 创建手部匹配计时器,用于记录手部识别了多少帧,初始值为10
         self.matched_counter: dict[str, int] = {n: 30 for n in hands_name_ls}
+
+    def __repr__(self) -> str:
+        return f"skhand.HandDetector.MediaPipeHandDetector(hands_name_ls={self.hands_name_ls}, hands_matcher={repr(self.hands_matcher)})"
+
+    def __str__(self) -> str:
+        return f"MediaPipeHandDetector(hands_name_ls={self.hands_name_ls}, hands_matcher={self.hands_matcher})"
 
     def detect(self, image: np.ndarray, hands_dict: dict[str, OneHand]) -> list[str]:
         """使用MediaPipe检测手部关键点,返回成功检测到的手部的名称

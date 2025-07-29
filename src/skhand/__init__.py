@@ -11,7 +11,7 @@ from .HandInputSchemes.FingerSwipeScheme import FingerSwipeScheme
 from . import HandData, HandDetector, HandInputSchemes, HandUtils
 
 # 定义版本
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 # 定义公共接口
 __all__ = [
     # 常用类

@@ -14,6 +14,12 @@ class HandsMatcher(ABC):
         self.row_n: int = 0  # 记录当前检测到的行/数量
         self.matched_dict: dict[int, str] = dict()
 
+    def __repr__(self) -> str:
+        return f"skhand.HandDetector.HandsMatcher(matched_ls={self.matched_ls})"
+
+    def __str__(self) -> str:
+        return f"HandsMatcher(matched_ls={self.matched_ls})"
+
     @abstractmethod
     def run(self, cost_matrix: np.ndarray) -> dict:
         """运行匹配算法,返回匹配后的字典
@@ -33,6 +39,12 @@ class HungarianMatcher(HandsMatcher):
         self.n: int = len(matched_ls)
         self.row_n: int = 0  # 记录当前检测到的行/数量
         self.matched_dict: dict[int, str] = dict()
+
+    def __repr__(self) -> str:
+        return f"skhand.HandDetector.HungarianMatcher(matched_ls={self.matched_ls})"
+
+    def __str__(self) -> str:
+        return f"HungarianMatcher(matched_ls={self.matched_ls})"
 
     def _extend2square(self, cost_matrix: np.ndarray) -> np.ndarray:
         """用0行填充剩下没有检测到的手,扩展成方阵,返回扩展后的成本矩阵(方阵)

@@ -16,6 +16,12 @@ class HandInputScheme(ABC):
         self.hand_input = hand_input
         self.hand_name: str = hand_name
 
+    def __repr__(self) -> str:
+        return f"skhand.HandInputScheme.HandInputScheme(hand_name={self.hand_name})"
+
+    def __str__(self) -> str:
+        return f"HandInputScheme(hand_name={self.hand_name})"
+
     @abstractmethod
     def update(self) -> Any:
         """实时更新手部操控方案,外部通过调用其他类属性或方法来使用手部操控方案"""

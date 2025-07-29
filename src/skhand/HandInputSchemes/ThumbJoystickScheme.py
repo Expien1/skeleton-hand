@@ -27,6 +27,15 @@ class ThumbJoystickScheme(HandInputScheme):
         # 定义一个变量用于区分,摇杆是否激活,默认为False未激活
         self._activate: bool = False
 
+    def __repr__(self) -> str:
+        return (
+            f"skhand.HandInputScheme.ThumbJoystickScheme("
+            f"hand_name={self.hand_name}, finger_btn={self.finger_btn})"
+        )
+
+    def __str__(self) -> str:
+        return f"ThumbJoystickScheme(hand_name={self.hand_name}, finger_btn={self.finger_btn})"
+
     def update(self) -> None:
         """实时更新定点的位置,直到长按才定下来"""
         # 获取并判断是否有检测到手部

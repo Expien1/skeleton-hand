@@ -21,6 +21,12 @@ class VisualHandDetector(ABC):
         self.hands_name_ls: list[str] = hands_name_ls
         self.hands_matcher: HandsMatcher = hands_matcher(hands_name_ls)
 
+    def __repr__(self) -> str:
+        return f"skhand.HandDetector.VisualHandDetector(hands_name_ls={self.hands_name_ls}, hands_matcher={repr(self.hands_matcher)})"
+
+    def __str__(self) -> str:
+        return f"VisualHandDetector(hands_name_ls={self.hands_name_ls}, hands_matcher={self.hands_matcher})"
+
     @abstractmethod
     def detect(self, image: np.ndarray, hands_dict: dict[str, OneHand]) -> list[str]:
         """使用视觉检测手部关键点,返回成功检测到的手部的名称

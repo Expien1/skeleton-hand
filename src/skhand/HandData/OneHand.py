@@ -92,6 +92,7 @@ class OneHand:
         self._angle_flag = False
         self._dist_flag = False
         self._data_flag = False
+        self._pos_data_flag = False
         self._finger_data_flag = False
         self._wrist_npos_diff_flag = False
         self._angle_diff_flag = False
@@ -100,7 +101,8 @@ class OneHand:
     def norm_pos(self) -> np.ndarray:
         """返回以手部矩形框左上角为原点的归一化关键点坐标"""
         if not self._normalized_flag:
-            return self.normalization()
+            self.normalization()
+            self._normalized_flag = True
         return self._norm_pos
 
     def normalization(self) -> np.ndarray:
@@ -114,15 +116,17 @@ class OneHand:
         # 更新手部矩形框
         self._box[:] = min_x, min_y, max_x, max_y
         # 归一化计算,以手部矩形框左上角为原点,坐标值范围在0到1内
-        self._norm_pos[:] = (self.raw_pos - min_arr) / (max_arr - min_arr)
-        self._normalized_flag = True
+        box_arr = max_arr - min_arr  # 计算矩形框的宽高
+        box_arr = np.where((box_arr != 0), box_arr, 1)  # 保证除数不为0
+        self._norm_pos[:] = (self.raw_pos - min_arr) / box_arr
         return self._norm_pos
 
     @property
     def wrist_npos(self) -> np.ndarray:
         """返回以手腕关键点坐标为原点的归一化关键点坐标"""
         if not self._wrist_npos_flag:
-            return self.calc_wrist_npos()
+            self.calc_wrist_npos()
+            self._wrist_npos_flag = True
         return self._wrist_npos
 
     def calc_wrist_npos(self) -> np.ndarray:
@@ -131,13 +135,11 @@ class OneHand:
         self._wrist_npos[:] = self.norm_pos
         # 以手腕关键点坐标位置为原点
         self._wrist_npos[1:, :] -= self._wrist_npos[0, :]
-        self._wrist_npos_flag = True
         return self._wrist_npos
 
     def calc_wrist_npos2(self) -> np.ndarray:
         """计算得到以手腕为原点的归一化坐标"""
         self._wrist_npos[:] = np.dot(T_NORM2WRIST, self.norm_pos)
-        self._wrist_npos_flag = True
         return self._wrist_npos
 
     @property
@@ -145,21 +147,25 @@ class OneHand:
         """获取手部矩形框4个顶点坐标"""
         if not self._normalized_flag:
             self.normalization()
+            self._normalized_flag = True
         return self._box
 
     @property
     def box_w(self) -> int:
+        """手部矩形框的宽度"""
         return self._box[3] - self._box[1]
 
     @property
     def box_h(self) -> int:
+        """手部矩形框的高度"""
         return self._box[2] - self._box[0]
 
     @property
     def fingers_angle(self) -> np.ndarray:
         """获取手指每个关节点的弯曲角度"""
         if not self._angle_flag:
-            return self.calc_5fingers_angle()
+            self.calc_5fingers_angle()
+            self._angle_flag = True
         return self._fingers_angle
 
     def calc_5fingers_angle(self) -> np.ndarray:
@@ -170,6 +176,7 @@ class OneHand:
         # 将每个手指向量都单位化,变成单位向量
         # 先计算行向量的模长
         vec_length = np.sqrt(np.sum(fingers_vec * fingers_vec, axis=1)).reshape((20, 1))
+        vec_length = np.where((vec_length != 0), vec_length, 1)  # 保证除数不为0
         fingers_vec = fingers_vec / vec_length  # 每个行向量元素都除以行向量模长
         # 计算每个手指的向量的夹角,这里range(0,20,4)是取每根手指最小的关键点到关键点0的向量
         for f_idx, v_idx in enumerate(range(0, 20, 4)):  # 每4截关节向量为一根手指
@@ -182,14 +189,14 @@ class OneHand:
             )
             # 将计算的角度结果,赋值给用于存储的变量
             self._fingers_angle[f_idx, :] = finger_angle
-        self._angle_flag = True
         return self._fingers_angle
 
     @property
     def thumb_dist(self) -> np.ndarray:
         """获取4个指尖到大拇指的距离"""
         if not self._dist_flag:
-            return self.calc_thumb_distance()
+            self.calc_thumb_distance()
+            self._dist_flag = True
         return self._thumb_dist
 
     def calc_thumb_distance(self) -> np.ndarray:
@@ -201,14 +208,14 @@ class OneHand:
             finger_point = self.norm_pos[finger_id, :]
             # 直接用l1范数来计算,也可以用np.sum(np.abs(point1 - point2))
             self._thumb_dist[i] = np.linalg.norm(thumb_tip_point - finger_point, ord=1)
-        self._dist_flag = True
         return self._thumb_dist
 
     @property
     def data(self) -> np.ndarray:
         """获取所有已整合好的数据"""
         if not self._data_flag:
-            return self.integrate_data()
+            self.integrate_data()
+            self._data_flag = True
         return self._data
 
     def integrate_data(self) -> np.ndarray:
@@ -221,7 +228,6 @@ class OneHand:
         self._data = np.concatenate(
             (self._data, np.ravel(self.fingers_angle, order="C"), self.thumb_dist)
         ).reshape(1, -1)
-        self._data_flag = True
         return self._data
 
     @property
@@ -236,7 +242,8 @@ class OneHand:
     def finger_data(self) -> np.ndarray:
         """获取手指角度和指尖距离数据"""
         if not self._finger_data_flag:
-            return self.integrate_finger_data()
+            self.integrate_finger_data()
+            self._finger_data_flag = True
         return self._finger_data
 
     def integrate_finger_data(self) -> np.ndarray:
@@ -244,7 +251,6 @@ class OneHand:
         self._finger_data = np.concatenate(
             (np.ravel(self.fingers_angle, order="C"), self.thumb_dist)
         ).reshape(1, -1)
-        self._finger_data_flag = True
         return self._finger_data
 
     @property

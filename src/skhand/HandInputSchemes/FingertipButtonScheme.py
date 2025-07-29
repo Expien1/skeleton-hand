@@ -51,6 +51,19 @@ class FingertipButtonScheme(HandInputScheme):
         # 按键状态标志,None表示没有按,False表示长按,True表示短按
         self._press_status: None | bool = None
 
+    def __repr__(self) -> str:
+        return (
+            f"skhand.HandInputScheme.FingertipButtonScheme("
+            f"hand_name={self.hand_name}, finger_touch_idx={self.finger_touch_idx}, "
+            f"short_press_time={self.short_press_time}, long_press_time={self.long_press_time})"
+        )
+
+    def __str__(self) -> str:
+        return (
+            f"FingertipButtonScheme(hand_name={self.hand_name}, finger_touch_idx={self.finger_touch_idx}, "
+            f"short_press_time={self.short_press_time}, long_press_time={self.long_press_time})"
+        )
+
     def update(self) -> None | bool:
         """实时更新指尖按钮计时判断"""
         # 获取并判断该手部数据是否有被检测到
@@ -59,7 +72,7 @@ class FingertipButtonScheme(HandInputScheme):
             self._press_status = None  # 将按钮状态重置为没有按下
             return None
         # 检测手指指尖是否触碰
-        if hand.gestrue.get_fg_touch(self.finger_touch_idx):
+        if hand.gestrue.finger_touch[self.finger_touch_idx]:
             if self._start_time is None:  # 记录开始触碰的时间戳
                 self._start_time = time()
             else:  # 记录按下的瞬间大拇指的相对于手腕的归一化坐标

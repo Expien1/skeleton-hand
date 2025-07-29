@@ -64,6 +64,21 @@ class FingerSwipeScheme(HandInputScheme):
         # 记录开始跟随的时间,用于判断跟随点是否超时
         self._start_time = time()
 
+    def __repr__(self) -> str:
+        return (
+            f"skhand.HandInputScheme.FingerSwipeScheme(hand_name={self.hand_name}, "
+            f"point_id={self.point_id}, swipe_velocity={self.swipe_velocity}, "
+            f"follow_velocity={self.follow_velocity}, "
+            f"min_swipe_dist={self.min_swipe_dist}, reset_time={self.reset_time})"
+        )
+
+    def __str__(self) -> str:
+        return (
+            f"FingerSwipeScheme(hand_name={self.hand_name}, point_id={self.point_id}, "
+            f"swipe_velocity={self.swipe_velocity}, follow_velocity={self.follow_velocity}, "
+            f"min_swipe_dist={self.min_swipe_dist}, reset_time={self.reset_time})"
+        )
+
     def _reset(self) -> None:
         """重置跟随点和计时器"""
         self._follow_point = None  # 重置跟随点为初始状态

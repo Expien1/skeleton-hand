@@ -1,4 +1,5 @@
 from time import time
+from warnings import warn
 
 import numpy as np
 from pandas import DataFrame
@@ -195,18 +196,17 @@ class HandDataAPI:
 
 
 class HandAPI:
-    __slots__ = "one_hand", "_base", "_data", "_gestrue", "_drawing"
+    __slots__ = "_base", "_data", "_gestrue", "_drawing"
 
     def __init__(self, one_hand: OneHand):
         """用于管理一只手部的所有相关数据和模型
         Args:
             one_hand: 输入该手部的基础数据类实例
         """
-        self.one_hand = one_hand
-        self._base: BaseHandAPI = BaseHandAPI(self.one_hand)
-        self._data: HandDataAPI = HandDataAPI(self.one_hand)
-        self._gestrue: Gestrue = Gestrue(self.one_hand)
-        self._drawing: HandDrawing = HandDrawing(self.one_hand)
+        self._base: BaseHandAPI = BaseHandAPI(one_hand)
+        self._data: HandDataAPI = HandDataAPI(one_hand)
+        self._gestrue: Gestrue = Gestrue(one_hand)
+        self._drawing: HandDrawing = HandDrawing(one_hand)
 
     @property
     def base(self) -> BaseHandAPI:
@@ -248,12 +248,13 @@ class HandInput:
         hands_matcher: type[HandsMatcher] = HungarianMatcher,
         **detector_kwargs,
     ) -> None:
+        # 手部数据字典用作手部检测的参数
+        self.one_hand_dict: dict[str, OneHand] = {
+            name: OneHand() for name in hands_name_ls
+        }
         # 利用传入的手部名字来创建对应的手部API字典
         self.hands_dict: dict[str, HandAPI] = {
-            name: HandAPI(OneHand()) for name in hands_name_ls
-        }
-        self.one_hand_dict: dict[str, OneHand] = {  # 手部数据字典用作手部检测的参数
-            name: hand.one_hand for name, hand in self.hands_dict.items()
+            name: HandAPI(ohand) for name, ohand in self.one_hand_dict.items()
         }
         # 根据传入的检测器类创建视觉手部检测器实例,添加手部名字列表的数量参数
         detector_kwargs["hands_name_ls"] = hands_name_ls
@@ -268,6 +269,12 @@ class HandInput:
         self._delta_time: float = 1
         # 创建存放手部操控方案的字典
         self.schemes: dict[str, HandInputScheme] = dict()
+
+    def __repr__(self) -> str:
+        return f"skhand.HandInput(\n\thands={list(self.hands_dict.keys())}, \n\tdetector={self.detector}, \n\tschemes={self.schemes}\n)"
+
+    def __str__(self) -> str:
+        return f"HandInput(\n\thands={list(self.hands_dict.keys())}, \n\tdetector={self.detector}, \n\tschemes={self.schemes}\n)"
 
     def run(self, frame: np.ndarray) -> list[str]:
         """运行手部关键点检测器,返回成功检测到的手部名称
@@ -291,6 +298,19 @@ class HandInput:
         """返回两帧之间的间隔时间,初始值为1"""
         return self._delta_time
 
+    def __getitem__(self, hand_name: str) -> HandAPI:
+        """指定相应的手部,返回对应手部的API,没有检测到就抛出错误
+        Args:
+            hand_name: 当前检测到的手部名字
+        """
+        # 检查指定的手部是否有检测到
+        if hand_name not in self.detected_name_ls:
+            raise KeyError(f"Hand named '{hand_name}' was not detected")
+        hand = self.hands_dict[hand_name]
+        hand.base.delta_time = self.delta_time  # 更新帧间时间
+        hand.drawing.raw_img = self.frame  # 设定原始图像
+        return hand
+
     def hand(self, hand_name: str) -> HandAPI | None:
         """指定相应的手部,返回对应手部的API,没有检测到的返回None
         Args:
@@ -309,7 +329,7 @@ class HandInput:
         hand = self.hand(hand_name)
         if hand is None:
             return None
-        hand.base.delta_time = self.delta_time
+        hand.base.delta_time = self.delta_time  # 更新帧间时间
         return hand.base
 
     def data(self, hand_name: str) -> HandDataAPI | None:
@@ -343,48 +363,6 @@ class HandInput:
         hand.drawing.raw_img = self.frame  # 设定原始图像
         return hand.drawing
 
-    def hand_unwrap(self, hand_name: str) -> HandAPI:
-        """指定相应的手部,返回对应手部的API,没有检测到就抛出错误
-        Args:
-            hand_name: 当前检测到的手部名字,没有检测到则报错
-        """
-        # 检查指定的手部是否有检测到
-        if hand_name not in self.detected_name_ls:
-            raise ValueError(f"No hand named '{hand_name}' was detected")
-        return self.hands_dict[hand_name]
-
-    def base_unwrap(self, hand_name: str) -> BaseHandAPI:
-        """获取基础的手部数据,没有检测到就抛出错误
-        Args:
-            hand_name: 当前检测到的手部名字,没有检测到则报错
-        """
-        hand = self.hand_unwrap(hand_name)
-        hand.base.delta_time = self.delta_time  # 设定时间间隔
-        return hand.base
-
-    def data_unwrap(self, hand_name: str) -> HandDataAPI:
-        """获取一维的手部相关数据,没有检测到就抛出错误
-        Args:
-            hand_name: 当前检测到的手部名字,没有检测到则报错
-        """
-        return self.hand_unwrap(hand_name).data
-
-    def gestrue_unwrap(self, hand_name: str) -> Gestrue:
-        """获取手势相关数据,没有检测到就抛出错误
-        Args:
-            hand_name: 当前检测到的手部名字,没有检测到则报错
-        """
-        return self.hand_unwrap(hand_name).gestrue
-
-    def drawing_unwrap(self, hand_name: str) -> HandDrawing:
-        """获取手部绘制工具,没有检测到就抛出错误
-        Args:
-            hand_name: 当前检测到的手部名字,没有检测到则报错
-        """
-        hand = self.hand_unwrap(hand_name)
-        hand.drawing.raw_img = self.frame  # 设定原始图像
-        return hand.drawing
-
     def add_scheme(
         self, hand_name: str, scheme_name: str, new_scheme: type[HandInputScheme]
     ):
@@ -395,6 +373,70 @@ class HandInput:
             scheme: 输入手部操控方案实例,创建时需设置好参数
         """
         if hand_name not in self.hands_dict.keys():
-            raise ValueError(f"No hand named '{hand_name}' is not exist")
+            raise KeyError(f"Hand named '{hand_name}' is not exist")
         # 使用默认参数来添加新的手部操控方案
         self.schemes[scheme_name] = new_scheme(self, hand_name)
+
+    """以下是已经弃用的函数"""
+
+    def hand_unwrap(self, hand_name: str) -> HandAPI:
+        """指定相应的手部,返回对应手部的API,没有检测到就抛出错误
+        Args:
+            hand_name: 当前检测到的手部名字,没有检测到则报错
+        """
+        # 检查指定的手部是否有检测到
+        warn(
+            "hand_unwrap is deprecated, you can use `HandInput[hand_name].hand` instead.",
+            category=DeprecationWarning,
+        )
+        if hand_name not in self.detected_name_ls:
+            raise ValueError(f"No hand named '{hand_name}' was detected")
+        return self.hands_dict[hand_name]
+
+    def base_unwrap(self, hand_name: str) -> BaseHandAPI:
+        """获取基础的手部数据,没有检测到就抛出错误
+        Args:
+            hand_name: 当前检测到的手部名字,没有检测到则报错
+        """
+        warn(
+            "base_unwrap is deprecated, you can use `HandInput[hand_name].base` instead.",
+            category=DeprecationWarning,
+        )
+        hand = self.hand_unwrap(hand_name)
+        hand.base.delta_time = self.delta_time  # 设定时间间隔
+        return hand.base
+
+    def data_unwrap(self, hand_name: str) -> HandDataAPI:
+        """获取一维的手部相关数据,没有检测到就抛出错误
+        Args:
+            hand_name: 当前检测到的手部名字,没有检测到则报错
+        """
+        warn(
+            "data_unwrap is deprecated, you can use `HandInput[hand_name].data` instead.",
+            category=DeprecationWarning,
+        )
+        return self.hand_unwrap(hand_name).data
+
+    def gestrue_unwrap(self, hand_name: str) -> Gestrue:
+        """获取手势相关数据,没有检测到就抛出错误
+        Args:
+            hand_name: 当前检测到的手部名字,没有检测到则报错
+        """
+        warn(
+            "gestrue_unwrap is deprecated, you can use `HandInput[hand_name].gestrue` instead.",
+            category=DeprecationWarning,
+        )
+        return self.hand_unwrap(hand_name).gestrue
+
+    def drawing_unwrap(self, hand_name: str) -> HandDrawing:
+        """获取手部绘制工具,没有检测到就抛出错误
+        Args:
+            hand_name: 当前检测到的手部名字,没有检测到则报错
+        """
+        warn(
+            "drawing_unwrap is deprecated, you can use `HandInput[hand_name].drawing` instead.",
+            category=DeprecationWarning,
+        )
+        hand = self.hand_unwrap(hand_name)
+        hand.drawing.raw_img = self.frame  # 设定原始图像
+        return hand.drawing
